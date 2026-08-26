@@ -1,23 +1,24 @@
 {
-  "name": "@vansnowi/baileys",
+  "name": "@lordeagle/baileys",
   "type": "module",
   "version": "1.5.7",
-  "description": "Self-modified fork of Baileys (based on @whiskeysockets/baileys 7.0.0-rc13) — ships prebuilt, installable as a normal semver dependency.",
+  "description": "Lordeagle Baileys — a Baileys-compatible WebSocket library designed for automations.",
   "keywords": [
     "whatsapp",
     "automation",
-    "baileys"
+    "baileys",
+    "lordeagle"
   ],
-  "homepage": "https://github.com/vanSnowi/baileys",
+  "homepage": "https://github.com/lordeagle-tech/eagle-baileys",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vanSnowi/baileys.git"
+    "url": "git+https://github.com/lordeagle-tech/eagle-baileys.git"
   },
   "bugs": {
-    "url": "https://github.com/vanSnowi/baileys/issues"
+    "url": "https://github.com/lordeagle-tech/eagle-baileys/issues"
   },
   "license": "MIT",
-  "author": "Rajeh Taher",
+  "author": "Lord Eagle",
   "main": "lib/index.js",
   "files": [
     "lib/**/*",

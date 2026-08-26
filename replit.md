@@ -1,6 +1,8 @@
-# Replit setup
+# Lordeagle Baileys on Replit
 
-This repository is a Node.js library, not a web application. It uses Node.js 20 (configured in `.replit`) and has no browser preview.
+This repository is the Lordeagle Baileys Node.js library, designed for automations. It is not a web application, so it has no browser preview. It uses Node.js 20, configured in `.replit`.
+
+The project remains compatible with the Baileys public API. Internal Baileys names and protocol identifiers are intentionally preserved because changing them would break consumers.
 
 ## Verify the package
 
