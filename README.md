@@ -6,14 +6,20 @@ Lordeagle Baileys is an independently maintained fork for developers building Wh
 
 ## Install
 
+### Option A: From NPM Registry
 ```sh
-npm install @lordeagle/baileys
+npm install @lordeagle21/baileys
+```
+
+### Option B: Directly from GitHub
+```sh
+npm install github:lordeagle-tech/eagle-baileys
 ```
 
 ## Basic usage
 
 ```js
-import makeWASocket from '@lordeagle/baileys'
+import makeWASocket from '@lordeagle21/baileys'
 
 const socket = makeWASocket({
   auth: yourAuthState,
@@ -22,11 +28,30 @@ const socket = makeWASocket({
 
 Create and securely persist an authentication state before connecting. Never commit session credentials or generated authentication files to Git.
 
-## Quick-reply buttons
+## Connection Monitoring
 
-Send one to three quick-reply buttons with unique IDs and labels of up to 20 characters:
+Lordeagle Baileys provides built-in utilities to monitor and check socket connections to WhatsApp:
 
 ```js
+// Check the connection state dynamically
+console.log(socket.connectionState) // 'connecting', 'open', or 'close'
+console.log(socket.isConnected)     // true if open
+
+// Explicitly check responsiveness by pinging the WhatsApp server
+try {
+  await socket.ping(5000) // 5s timeout
+  console.log('Connection is alive and healthy!')
+} catch (error) {
+  console.error('Connection is down or unresponsive:', error)
+}
+```
+
+## Quick-reply buttons
+
+Send one to three quick-reply buttons with unique IDs and labels of up to 20 characters. You can send plain text buttons or enhance them with media headers (images, video, documents, location, or product):
+
+```js
+// Text-only buttons
 await socket.sendMessage('254700000000@s.whatsapp.net', {
   text: 'Would you like to continue?',
   title: 'Automation',
@@ -36,12 +61,23 @@ await socket.sendMessage('254700000000@s.whatsapp.net', {
     { id: 'cancel', displayText: 'Cancel' },
   ],
 })
+
+// Media-enhanced buttons (e.g. Image buttons)
+await socket.sendMessage('254700000000@s.whatsapp.net', {
+  image: { url: 'https://example.com/image.jpg' },
+  caption: 'Here is your report. Would you like to download?',
+  footer: 'Report Bot',
+  buttons: [
+    { id: 'download_pdf', displayText: 'Download PDF' },
+    { id: 'dismiss', displayText: 'Dismiss' },
+  ],
+})
 ```
 
 Use `getButtonReplyInfo` to read both modern interactive replies and legacy button replies through one stable shape:
 
 ```js
-import { getButtonReplyInfo } from '@lordeagle/baileys'
+import { getButtonReplyInfo } from '@lordeagle21/baileys'
 
 socket.ev.on('messages.upsert', ({ messages }) => {
   const reply = getButtonReplyInfo(messages[0])
