@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { generateWAMessageContent, getButtonReplyInfo } from '../lib/Utils/messages.js';
+import makeWASocket from '../lib/index.js';
 
 const generated = await generateWAMessageContent({
   text: 'Choose an option',
@@ -169,5 +170,73 @@ assert.throws(() => assertUserPresenceSubscriptionJid('@lid'), /individual user 
 assert.throws(() => assertUserPresenceSubscriptionJid('x@evil@s.whatsapp.net'), /individual user JIDs/);
 assert.throws(() => assertUserPresenceSubscriptionJid('123:4@s.whatsapp.net'), /individual user JIDs/);
 assert.throws(() => assertUserPresenceSubscriptionJid('not-a-number@s.whatsapp.net'), /individual user JIDs/);
+
+// Test button message with caption instead of text
+const captionGenerated = await generateWAMessageContent({
+  caption: 'Body Caption',
+  buttons: [{ id: 'opt1', displayText: 'Option 1' }]
+}, {});
+assert.equal(captionGenerated.interactiveMessage.body.text, 'Body Caption');
+
+// Test location button message
+const locationButtons = await generateWAMessageContent({
+  text: 'Select Location',
+  location: { degreesLatitude: -1.2, degreesLongitude: 36.8, name: 'Nairobi' },
+  buttons: [{ id: 'loc1', displayText: 'Select' }]
+}, {});
+assert.equal(locationButtons.interactiveMessage.body.text, 'Select Location');
+assert.equal(locationButtons.interactiveMessage.header.hasMediaAttachment, true);
+assert.equal(locationButtons.interactiveMessage.header.locationMessage.degreesLatitude, -1.2);
+
+// Test image buttons (with mock image buffer)
+const imageButtons = await generateWAMessageContent({
+  caption: 'Image buttons',
+  image: Buffer.from('mock-image-data'),
+  buttons: [{ id: 'img1', displayText: 'Click Me' }]
+}, {
+  upload: async (filePath) => {
+    return { mediaUrl: 'https://mock/media', directPath: 'mock-path' };
+  }
+});
+assert.equal(imageButtons.interactiveMessage.body.text, 'Image buttons');
+assert.equal(imageButtons.interactiveMessage.header.hasMediaAttachment, true);
+assert.ok(imageButtons.interactiveMessage.header.imageMessage);
+
+// Test socket connection properties and ping exports
+const mockSock = makeWASocket({
+  auth: {
+    creds: {
+      noiseKey: { public: new Uint8Array(32), private: new Uint8Array(32) },
+      pairingEphemeralKeyPair: { public: new Uint8Array(32), private: new Uint8Array(32) },
+      signedIdentityKey: { public: new Uint8Array(32), private: new Uint8Array(32) },
+      signedPreKey: { keyId: 1, keyPair: { public: new Uint8Array(32), private: new Uint8Array(32) } },
+      registrationId: 1,
+      advSecretKey: 'abc',
+      nextPreKeyId: 1,
+      firstUnuploadedPreKeyId: 1,
+      accountSettings: { unarchiveChats: false }
+    },
+    keys: {
+      get: async () => ({}),
+      set: async () => ({}),
+      transaction: async (cb) => cb()
+    }
+  },
+  logger: {
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+    trace: () => {},
+    child: function() { return this; }
+  }
+});
+
+assert.equal(mockSock.connectionState, 'connecting');
+assert.equal(mockSock.isConnected, false);
+assert.ok(typeof mockSock.ping === 'function');
+
+// Clean up/close socket connection so it doesn't keep the event loop open
+mockSock.end(new Error('Test cleanup'));
 
 console.log('Feature tests passed: buttons, replies, and subscription guards.');
