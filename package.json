@@ -1,5 +1,5 @@
 {
-  "name": "@lordeagle/baileys",
+  "name": "@lordeagle21/baileys",
   "type": "module",
   "version": "1.5.8",
   "description": "Lordeagle Baileys — a Baileys-compatible WebSocket library designed for automations.",
