@@ -29,7 +29,9 @@
     "preinstall": "node ./engine-requirements.js",
     "prepare": "node WAProto/compiler.js",
     "smoke": "node ./scripts/smoke-test.js && node ./scripts/feature-test.js",
-    "test": "node ./scripts/feature-test.js"
+    "test": "node ./scripts/feature-test.js",
+    "test:buttons:pair": "node ./scripts/pair-button-test.js",
+    "test:buttons:live": "node ./scripts/live-button-test.js"
   },
   "dependencies": {
     "@cacheable/node-cache": "^1.4.0",

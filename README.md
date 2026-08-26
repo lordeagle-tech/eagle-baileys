@@ -54,6 +54,43 @@ socket.ev.on('messages.upsert', ({ messages }) => {
 
 Invalid buttons, duplicate IDs, empty labels, and more than three buttons are rejected before sending.
 
+### Live client verification
+
+The automated tests validate the protocol shape without contacting WhatsApp. Live verification needs two test accounts: a sender account paired to this project and a different recipient account where you can open the current WhatsApp clients.
+
+Pair the sender once. Use its phone number with country code and digits only (no `+`, spaces, or punctuation):
+
+```sh
+BAILEYS_LIVE_BUTTON_TEST=1 \
+BAILEYS_BUTTON_TEST_SENDER_PHONE=254711111111 \
+BAILEYS_BUTTON_TEST_AUTH_DIR=.button-test-auth \
+npm run test:buttons:pair
+```
+
+The terminal prints a temporary pairing code. On the sender phone, open **WhatsApp > Linked devices > Link a device > Link with phone number instead**, enter the code, and wait for the terminal to confirm that pairing completed. Treat the code and `.button-test-auth` directory as credentials: do not share them or commit them.
+
+Then send the button message to the separate recipient account:
+
+```sh
+BAILEYS_LIVE_BUTTON_TEST=1 \
+BAILEYS_BUTTON_TEST_RECIPIENT=254722222222@s.whatsapp.net \
+BAILEYS_BUTTON_TEST_AUTH_DIR=.button-test-auth \
+npm run test:buttons:live
+```
+
+Open the recipient chat on the client being checked, confirm that both buttons are visible, and tap one. The terminal checks the reply ID and label through `getButtonReplyInfo`. To require a particular click, add `BAILEYS_BUTTON_TEST_EXPECTED_ID=continue` or `BAILEYS_BUTTON_TEST_EXPECTED_ID=cancel`. Repeat the send command for Android, iPhone, Web, and Desktop. The recipient must be a test account you control; the test refuses groups, channels, broadcasts, and unregistered sessions.
+
+For each run, record the result on the client where the recipient tapped the button:
+
+| Client | Rendered two buttons | Click produced the expected ID and label | Reply type |
+| --- | --- | --- | --- |
+| Android | ☐ | ☐ | `interactive` / `legacy` / `template` |
+| iPhone | ☐ | ☐ | `interactive` / `legacy` / `template` |
+| Web | ☐ | ☐ | `interactive` / `legacy` / `template` |
+| Desktop | ☐ | ☐ | `interactive` / `legacy` / `template` |
+
+The current interactive native-flow format is intended for supported, up-to-date WhatsApp clients; obsolete clients may not show clickable buttons or may return a legacy/template response. The default API validation remains unchanged: only one to three buttons, unique non-empty IDs, non-empty message text, and labels of at most 20 characters are accepted. Use the normalized reply helper rather than depending on a client-specific response type.
+
 ## Explicit channel and group actions
 
 Lordeagle Baileys does not automatically follow channels or join groups. Channel follows and group joins only occur when your application explicitly calls methods such as `newsletterFollow` or `groupAcceptInvite`.
