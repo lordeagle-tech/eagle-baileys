@@ -28,3 +28,7 @@ args = "npm run smoke"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
