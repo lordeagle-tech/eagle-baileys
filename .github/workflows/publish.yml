@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
-          scope: '@vansnowi'
+          scope: '@lordeagle'
 
       - name: Install deps
         run: npm install --ignore-scripts --no-audit --no-fund
