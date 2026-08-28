@@ -28,6 +28,25 @@ const socket = makeWASocket({
 
 Create and securely persist an authentication state before connecting. Never commit session credentials or generated authentication files to Git.
 
+## Pairing code
+
+The default pairing code is the fixed eight-character code `NICKCORP`. You can
+change it globally in the socket configuration or override it for one request:
+
+```js
+const socket = makeWASocket({
+  auth: yourAuthState,
+  pairingCode: 'MYCODE12',
+})
+
+await socket.requestPairingCode('254700000000')
+// Or: await socket.requestPairingCode('254700000000', 'MYCODE12')
+```
+
+Pairing codes must be exactly eight characters. A fixed code is less secure
+than a randomly generated, one-time code, so use a private value and change it
+if it becomes known.
+
 ## Connection Monitoring
 
 Lordeagle Baileys provides built-in utilities to monitor and check socket connections to WhatsApp:
