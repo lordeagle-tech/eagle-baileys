@@ -1,7 +1,7 @@
 {
   "name": "@lordeagle21/baileys",
   "type": "module",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "description": "Lordeagle Baileys — a Baileys-compatible WebSocket library designed for automations.",
   "keywords": [
     "whatsapp",
