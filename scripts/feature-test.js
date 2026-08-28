@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { generateWAMessageContent, getButtonReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket from '../lib/index.js';
+import makeWASocket, { DEFAULT_PAIRING_CODE } from '../lib/index.js';
+
+assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
 
 const generated = await generateWAMessageContent({
   text: 'Choose an option',
