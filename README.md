@@ -176,6 +176,33 @@ For each run, record the result on the client where the recipient tapped the but
 
 The current interactive native-flow format is intended for supported, up-to-date WhatsApp clients; obsolete clients may not show clickable buttons or may return a legacy/template response. The default API validation remains unchanged: only one to three buttons, unique non-empty IDs, non-empty message text, and labels of at most 20 characters are accepted. Use the normalized reply helper rather than depending on a client-specific response type.
 
+## Automatic reconnection
+
+Automatic reconnection is enabled by default. When a recoverable network
+connection closes, the same socket API and `socket.ev` event stream are kept
+while Baileys creates a replacement connection using the existing auth state.
+Retries use exponential backoff, up to 10 attempts by default:
+
+```js
+const socket = makeWASocket({
+  auth: yourAuthState,
+  maxReconnectAttempts: 5,
+  reconnectInitialDelayMs: 1000,
+  reconnectMaxDelayMs: 30000,
+})
+
+socket.ev.on('connection.update', update => {
+  if (update.isReconnecting) {
+    console.log(`Reconnect attempt ${update.reconnectAttempt}`)
+  }
+})
+```
+
+Set `autoReconnect: false` to retain manual reconnection behavior. Calling
+`socket.end()` permanently stops retries; use `socket.reconnect()` when you
+want to replace the connection deliberately. Logout, forbidden, bad-session,
+device-replacement, and multi-device mismatch errors are not retried.
+
 ## Explicit channel and group actions
 
 Lordeagle Baileys does not automatically follow channels or join groups. Channel follows and group joins only occur when your application explicitly calls methods such as `newsletterFollow` or `groupAcceptInvite`.
