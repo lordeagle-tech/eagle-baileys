@@ -254,6 +254,7 @@ const mockSock = makeWASocket({
 assert.equal(mockSock.connectionState, 'connecting');
 assert.equal(mockSock.isConnected, false);
 assert.ok(typeof mockSock.ping === 'function');
+assert.ok(typeof mockSock.reconnect === 'function');
 assert.equal(mockSock.resolveJid('support'), '254700000001@s.whatsapp.net');
 assert.equal(mockSock.setJidAlias('team', '254700000002'), '254700000002@s.whatsapp.net');
 assert.equal(mockSock.resolveJid('+254 700 000 002'), '254700000002@s.whatsapp.net');
