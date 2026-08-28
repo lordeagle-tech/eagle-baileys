@@ -47,6 +47,36 @@ Pairing codes must be exactly eight characters. A fixed code is less secure
 than a randomly generated, one-time code, so use a private value and change it
 if it becomes known.
 
+## JID normalization and local aliases
+
+The socket accepts international phone numbers, existing JIDs, and configured
+local aliases anywhere a recipient JID is accepted by `sendMessage` or
+`presenceSubscribe`. LIDs remain server-managed and are never rewritten:
+
+```js
+const socket = makeWASocket({
+  auth: yourAuthState,
+  jidAliases: {
+    support: '+254 700 000 001',
+  },
+})
+
+await socket.sendMessage('support', { text: 'Hello' })
+await socket.sendMessage('+254 700 000 002', { text: 'Hello' })
+await socket.presenceSubscribe('support')
+```
+
+Aliases can also be managed after creating the socket:
+
+```js
+socket.setJidAlias('finance', '254700000003')
+console.log(socket.resolveJid('finance')) // 254700000003@s.whatsapp.net
+socket.removeJidAlias('finance')
+```
+
+Phone numbers must include their country code. Alias values can be phone
+numbers or real WhatsApp JIDs, including LIDs returned by WhatsApp.
+
 ## Connection Monitoring
 
 Lordeagle Baileys provides built-in utilities to monitor and check socket connections to WhatsApp:

@@ -2,9 +2,23 @@ import assert from 'node:assert/strict';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { generateWAMessageContent, getButtonReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket, { DEFAULT_PAIRING_CODE } from '../lib/index.js';
+import makeWASocket, { createJidResolver, DEFAULT_PAIRING_CODE, normalizeJid, normalizePhoneNumber } from '../lib/index.js';
 
 assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
+assert.equal(normalizePhoneNumber('+254 (700) 000-000'), '254700000000');
+assert.equal(normalizeJid('+254 700 000 000'), '254700000000@s.whatsapp.net');
+assert.equal(normalizeJid('12345@c.us'), '12345@s.whatsapp.net');
+assert.equal(normalizeJid('12345:2@lid'), '12345:2@lid');
+const jidResolver = createJidResolver({
+  support: '+254700000001'
+});
+assert.equal(jidResolver.resolve('support'), '254700000001@s.whatsapp.net');
+assert.equal(jidResolver.setAlias('team', '254700000002'), '254700000002@s.whatsapp.net');
+assert.equal(jidResolver.removeAlias('team'), true);
+assert.deepEqual(jidResolver.getAliases(), {
+  support: '254700000001@s.whatsapp.net'
+});
+assert.throws(() => normalizeJid('unknown-contact'), /Phone number must contain/);
 
 const generated = await generateWAMessageContent({
   text: 'Choose an option',
@@ -231,12 +245,19 @@ const mockSock = makeWASocket({
     debug: () => {},
     trace: () => {},
     child: function() { return this; }
+  },
+  jidAliases: {
+    support: '+254700000001'
   }
 });
 
 assert.equal(mockSock.connectionState, 'connecting');
 assert.equal(mockSock.isConnected, false);
 assert.ok(typeof mockSock.ping === 'function');
+assert.equal(mockSock.resolveJid('support'), '254700000001@s.whatsapp.net');
+assert.equal(mockSock.setJidAlias('team', '254700000002'), '254700000002@s.whatsapp.net');
+assert.equal(mockSock.resolveJid('+254 700 000 002'), '254700000002@s.whatsapp.net');
+assert.equal(mockSock.removeJidAlias('team'), true);
 
 // Clean up/close socket connection so it doesn't keep the event loop open
 mockSock.end(new Error('Test cleanup'));
