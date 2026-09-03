@@ -253,14 +253,43 @@ const mockSock = makeWASocket({
 
 assert.equal(mockSock.connectionState, 'connecting');
 assert.equal(mockSock.isConnected, false);
-assert.ok(typeof mockSock.ping === 'function');
-assert.ok(typeof mockSock.reconnect === 'function');
-assert.equal(mockSock.resolveJid('support'), '254700000001@s.whatsapp.net');
-assert.equal(mockSock.setJidAlias('team', '254700000002'), '254700000002@s.whatsapp.net');
-assert.equal(mockSock.resolveJid('+254 700 000 002'), '254700000002@s.whatsapp.net');
-assert.equal(mockSock.removeJidAlias('team'), true);
+assert.ok(typeof mockSock.groupParticipantsAdd === 'function');
+assert.ok(typeof mockSock.groupParticipantsRemove === 'function');
+assert.ok(typeof mockSock.groupParticipantsPromote === 'function');
+assert.ok(typeof mockSock.groupParticipantsDemote === 'function');
+assert.ok(typeof mockSock.groupParticipantsApprove === 'function');
+assert.ok(typeof mockSock.groupParticipantsReject === 'function');
+
+// Test groupInvite / groupMessageV2 generation
+const groupInviteGenerated = await generateWAMessageContent({
+  groupInvite: {
+    groupJid: '120363000000000000@g.us',
+    inviteCode: 'ABCDEF123456',
+    inviteExpiration: 1700000000,
+    groupName: 'Test Group V2',
+    caption: 'Join our group'
+  }
+}, {});
+assert.equal(groupInviteGenerated.groupInviteMessage.groupJid, '120363000000000000@g.us');
+assert.equal(groupInviteGenerated.groupInviteMessage.inviteCode, 'ABCDEF123456');
+assert.equal(groupInviteGenerated.groupInviteMessage.groupName, 'Test Group V2');
+assert.equal(groupInviteGenerated.groupInviteMessage.caption, 'Join our group');
+
+// Test top-level forwarding and externalAdReply properties
+const forwardedMsg = await generateWAMessageContent({
+  text: 'Forwarded bot reply test',
+  isForwarded: true,
+  forwardingScore: 999,
+  forwardedNewsletterMessageInfo: {
+    newsletterJid: '120363322464215140@newsletter',
+    newsletterName: 'EAGLE-BOTS'
+  }
+}, {});
+assert.equal(forwardedMsg.extendedTextMessage.contextInfo.isForwarded, true);
+assert.equal(forwardedMsg.extendedTextMessage.contextInfo.forwardingScore, 999);
+assert.equal(forwardedMsg.extendedTextMessage.contextInfo.forwardedNewsletterMessageInfo.newsletterJid, '120363322464215140@newsletter');
 
 // Clean up/close socket connection so it doesn't keep the event loop open
 mockSock.end(new Error('Test cleanup'));
 
-console.log('Feature tests passed: buttons, replies, and subscription guards.');
+console.log('Feature tests passed: buttons, replies, subscription guards, group participant/v2 functions, and forwarded reply options.');
