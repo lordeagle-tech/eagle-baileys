@@ -16,218 +16,111 @@ npm install @lordeagle21/baileys
 npm install github:lordeagle-tech/eagle-baileys
 ```
 
-## Basic usage
+## Basic Bot Usage
 
 ```js
-import makeWASocket from '@lordeagle21/baileys'
+import makeWASocket, { useMultiFileAuthState } from '@lordeagle21/baileys'
+
+const { state, saveCreds } = await useMultiFileAuthState('auth_info')
 
 const socket = makeWASocket({
-  auth: yourAuthState,
+  auth: state,
+  pairingCode: 'NICKCORP', // Default 8-character pairing code
+})
+
+socket.ev.on('creds.update', saveCreds)
+
+socket.ev.on('messages.upsert', async ({ messages }) => {
+  const m = messages[0]
+  if (!m.message || m.key.fromMe) return
+
+  const jid = m.key.remoteJid
+  console.log('Received message from:', jid)
 })
 ```
 
-Create and securely persist an authentication state before connecting. Never commit session credentials or generated authentication files to Git.
+## Bot Features
 
-## Pairing code
+### 1. Contact & Fake Contact Quote (`fkon`)
 
-The default pairing code is the fixed eight-character code `NICKCORP`. You can
-change it globally in the socket configuration or override it for one request:
+Send contact cards directly or reply quoting a fake status broadcast contact:
 
 ```js
-const socket = makeWASocket({
-  auth: yourAuthState,
-  pairingCode: 'MYCODE12',
+// Send a contact card
+await socket.sendContact(jid, '254700000000', 'chiethaa')
+
+// Or reply using a fake contact quote (fkon)
+const fkon = socket.createFakeContact({
+  name: 'chiethaa',
+  number: '254700000000',
 })
 
-await socket.requestPairingCode('254700000000')
-// Or: await socket.requestPairingCode('254700000000', 'MYCODE12')
+await socket.sendMessage(jid, { text: 'Hello from bot!' }, { quoted: fkon })
+
+// Shorthand method
+await socket.sendFakeContact(jid, 'Hello from bot!', {
+  name: 'chiethaa',
+  number: '254700000000',
+})
 ```
 
-Pairing codes must be exactly eight characters. A fixed code is less secure
-than a randomly generated, one-time code, so use a private value and change it
-if it becomes known.
+### 2. Quick-Reply Buttons
 
-## JID normalization and local aliases
+Send 1 to 3 interactive quick-reply buttons with text or media headers:
 
-The socket accepts international phone numbers, existing JIDs, and configured
-local aliases anywhere a recipient JID is accepted by `sendMessage` or
-`presenceSubscribe`. LIDs remain server-managed and are never rewritten:
+```js
+import { getButtonReplyInfo } from '@lordeagle21/baileys'
+
+// Send text buttons
+await socket.sendMessage(jid, {
+  text: 'Choose an option below:',
+  title: 'Automation',
+  footer: 'Lordeagle Baileys',
+  buttons: [
+    { id: 'btn_yes', displayText: 'Yes' },
+    { id: 'btn_no', displayText: 'No' },
+  ],
+})
+
+// Listen for button replies
+socket.ev.on('messages.upsert', ({ messages }) => {
+  const reply = getButtonReplyInfo(messages[0])
+  if (reply) {
+    console.log(`Button tapped: ${reply.id} (${reply.displayText})`)
+  }
+})
+```
+
+### 3. Pairing Code
+
+Connect without scanning a QR code using an 8-character pairing code:
 
 ```js
 const socket = makeWASocket({
-  auth: yourAuthState,
+  auth: state,
+  pairingCode: 'NICKCORP',
+})
+
+const code = await socket.requestPairingCode('254700000000')
+console.log(`Pairing code: ${code}`)
+```
+
+### 4. JID Normalization & Aliases
+
+Normalize phone numbers and set local aliases:
+
+```js
+const socket = makeWASocket({
+  auth: state,
   jidAliases: {
     support: '+254 700 000 001',
   },
 })
 
-await socket.sendMessage('support', { text: 'Hello' })
-await socket.sendMessage('+254 700 000 002', { text: 'Hello' })
-await socket.presenceSubscribe('support')
+await socket.sendMessage('support', { text: 'Hello support!' })
+await socket.sendMessage('+254 700 000 002', { text: 'Hello!' })
 ```
 
-Aliases can also be managed after creating the socket:
+## License
 
-```js
-socket.setJidAlias('finance', '254700000003')
-console.log(socket.resolveJid('finance')) // 254700000003@s.whatsapp.net
-socket.removeJidAlias('finance')
-```
-
-Phone numbers must include their country code. Alias values can be phone
-numbers or real WhatsApp JIDs, including LIDs returned by WhatsApp.
-
-## Connection Monitoring
-
-Lordeagle Baileys provides built-in utilities to monitor and check socket connections to WhatsApp:
-
-```js
-// Check the connection state dynamically
-console.log(socket.connectionState) // 'connecting', 'open', or 'close'
-console.log(socket.isConnected)     // true if open
-
-// Explicitly check responsiveness by pinging the WhatsApp server
-try {
-  await socket.ping(5000) // 5s timeout
-  console.log('Connection is alive and healthy!')
-} catch (error) {
-  console.error('Connection is down or unresponsive:', error)
-}
-```
-
-## Quick-reply buttons
-
-Send one to three quick-reply buttons with unique IDs and labels of up to 20 characters. You can send plain text buttons or enhance them with media headers (images, video, documents, location, or product):
-
-```js
-// Text-only buttons
-await socket.sendMessage('254700000000@s.whatsapp.net', {
-  text: 'Would you like to continue?',
-  title: 'Automation',
-  footer: 'Lordeagle Baileys',
-  buttons: [
-    { id: 'continue', displayText: 'Continue' },
-    { id: 'cancel', displayText: 'Cancel' },
-  ],
-})
-
-// Media-enhanced buttons (e.g. Image buttons)
-await socket.sendMessage('254700000000@s.whatsapp.net', {
-  image: { url: 'https://example.com/image.jpg' },
-  caption: 'Here is your report. Would you like to download?',
-  footer: 'Report Bot',
-  buttons: [
-    { id: 'download_pdf', displayText: 'Download PDF' },
-    { id: 'dismiss', displayText: 'Dismiss' },
-  ],
-})
-```
-
-Use `getButtonReplyInfo` to read both modern interactive replies and legacy button replies through one stable shape:
-
-```js
-import { getButtonReplyInfo } from '@lordeagle21/baileys'
-
-socket.ev.on('messages.upsert', ({ messages }) => {
-  const reply = getButtonReplyInfo(messages[0])
-
-  if (reply) {
-    console.log(reply.id, reply.displayText, reply.type)
-  }
-})
-```
-
-Invalid buttons, duplicate IDs, empty labels, and more than three buttons are rejected before sending.
-
-### Live client verification
-
-The automated tests validate the protocol shape without contacting WhatsApp. Live verification needs two test accounts: a sender account paired to this project and a different recipient account where you can open the current WhatsApp clients.
-
-Pair the sender once. Use its phone number with country code and digits only (no `+`, spaces, or punctuation):
-
-```sh
-BAILEYS_LIVE_BUTTON_TEST=1 \
-BAILEYS_BUTTON_TEST_SENDER_PHONE=254711111111 \
-BAILEYS_BUTTON_TEST_AUTH_DIR=.button-test-auth \
-npm run test:buttons:pair
-```
-
-The terminal prints a temporary pairing code. On the sender phone, open **WhatsApp > Linked devices > Link a device > Link with phone number instead**, enter the code, and wait for the terminal to confirm that pairing completed. Treat the code and `.button-test-auth` directory as credentials: do not share them or commit them.
-
-Then send the button message to the separate recipient account:
-
-```sh
-BAILEYS_LIVE_BUTTON_TEST=1 \
-BAILEYS_BUTTON_TEST_RECIPIENT=254722222222@s.whatsapp.net \
-BAILEYS_BUTTON_TEST_AUTH_DIR=.button-test-auth \
-npm run test:buttons:live
-```
-
-Open the recipient chat on the client being checked, confirm that both buttons are visible, and tap one. The terminal checks the reply ID and label through `getButtonReplyInfo`. To require a particular click, add `BAILEYS_BUTTON_TEST_EXPECTED_ID=continue` or `BAILEYS_BUTTON_TEST_EXPECTED_ID=cancel`. Repeat the send command for Android, iPhone, Web, and Desktop. The recipient must be a test account you control; the test refuses groups, channels, broadcasts, and unregistered sessions.
-
-For each run, record the result on the client where the recipient tapped the button:
-
-| Client | Rendered two buttons | Click produced the expected ID and label | Reply type |
-| --- | --- | --- | --- |
-| Android | ☐ | ☐ | `interactive` / `legacy` / `template` |
-| iPhone | ☐ | ☐ | `interactive` / `legacy` / `template` |
-| Web | ☐ | ☐ | `interactive` / `legacy` / `template` |
-| Desktop | ☐ | ☐ | `interactive` / `legacy` / `template` |
-
-The current interactive native-flow format is intended for supported, up-to-date WhatsApp clients; obsolete clients may not show clickable buttons or may return a legacy/template response. The default API validation remains unchanged: only one to three buttons, unique non-empty IDs, non-empty message text, and labels of at most 20 characters are accepted. Use the normalized reply helper rather than depending on a client-specific response type.
-
-## Automatic reconnection
-
-Automatic reconnection is enabled by default. When a recoverable network
-connection closes, the same socket API and `socket.ev` event stream are kept
-while Baileys creates a replacement connection using the existing auth state.
-Retries use exponential backoff, up to 10 attempts by default:
-
-```js
-const socket = makeWASocket({
-  auth: yourAuthState,
-  maxReconnectAttempts: 5,
-  reconnectInitialDelayMs: 1000,
-  reconnectMaxDelayMs: 30000,
-})
-
-socket.ev.on('connection.update', update => {
-  if (update.isReconnecting) {
-    console.log(`Reconnect attempt ${update.reconnectAttempt}`)
-  }
-})
-```
-
-Set `autoReconnect: false` to retain manual reconnection behavior. Calling
-`socket.end()` permanently stops retries; use `socket.reconnect()` when you
-want to replace the connection deliberately. Logout, forbidden, bad-session,
-device-replacement, and multi-device mismatch errors are not retried.
-
-## Explicit channel and group actions
-
-Lordeagle Baileys does not automatically follow channels or join groups. Channel follows and group joins only occur when your application explicitly calls methods such as `newsletterFollow` or `groupAcceptInvite`.
-
-`presenceSubscribe` is restricted to individual user JIDs. Passing a group, channel, or status JID throws an error instead of sending a subscription request.
-
-## Development
-
-This repository requires Node.js 20 or newer.
-
-```sh
-npm install
-npm run prepare
-npm test
-npm run smoke
-```
-
-The smoke test imports the public package entry point and verifies that the socket factory and generated protocol codecs are available. It does not connect to WhatsApp or require account credentials.
-
-The longer upstream usage guide is preserved in [`README.upstream.md`](./README.upstream.md) as a reference for supported Baileys APIs.
-
-## Disclaimer
-
-This project is not affiliated with, authorized by, endorsed by, or officially connected with WhatsApp or its subsidiaries. Use it responsibly and in accordance with WhatsApp’s terms and applicable law. Do not use it for spam, stalking, or other abusive automation.
-
-## License and attribution
-
-Lordeagle Baileys is distributed under the MIT License. It is based on the open-source Baileys project and retains the original copyright and license notices. See [`LICENSE`](./LICENSE) for details.
+MIT License. Copyright (c) Lord Eagle.

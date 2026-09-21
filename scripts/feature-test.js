@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
-import { generateWAMessageContent, getButtonReplyInfo } from '../lib/Utils/messages.js';
+import { createFakeContact, generateVCard, generateWAMessage, generateWAMessageContent, getButtonReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, DEFAULT_PAIRING_CODE, normalizeJid, normalizePhoneNumber } from '../lib/index.js';
 
 assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
@@ -289,7 +289,75 @@ assert.equal(forwardedMsg.extendedTextMessage.contextInfo.isForwarded, true);
 assert.equal(forwardedMsg.extendedTextMessage.contextInfo.forwardingScore, 999);
 assert.equal(forwardedMsg.extendedTextMessage.contextInfo.forwardedNewsletterMessageInfo.newsletterJid, '120363322464215140@newsletter');
 
+// Test contact and fake contact helpers on socket
+assert.ok(typeof mockSock.sendContact === 'function');
+assert.ok(typeof mockSock.sendFakeContact === 'function');
+assert.ok(typeof mockSock.createFakeContact === 'function');
+
+// Test createFakeContact utility
+const fakeContact = createFakeContact({
+  name: 'chiethaa',
+  number: '254700000000'
+});
+assert.equal(fakeContact.key.fromMe, false);
+assert.equal(fakeContact.key.participant, '0@s.whatsapp.net');
+assert.equal(fakeContact.key.remoteJid, 'status@broadcast');
+assert.ok(typeof fakeContact.key.id === 'string' && fakeContact.key.id.length > 0);
+assert.equal(fakeContact.message.contactMessage.displayName, 'chiethaa');
+assert.ok(fakeContact.message.contactMessage.vcard.includes('FN:chiethaa'));
+assert.ok(fakeContact.message.contactMessage.vcard.includes('waid=254700000000:254700000000'));
+assert.ok(fakeContact.message.contactMessage.vcard.includes('item1.X-ABLabel:Ponsel'));
+
+// Test quoting with user's exact snippet structure (without key.id)
+const chiethaa = 'chiethaa';
+const sender = '254700000000@s.whatsapp.net';
+const userContactMessage = {
+  key: { fromMe: false, participant: '0@s.whatsapp.net', remoteJid: 'status@broadcast' },
+  message: {
+    contactMessage: {
+      displayName: chiethaa,
+      vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${chiethaa};;;;\nFN:${chiethaa}\nitem1.TEL;waid=${sender?.split('@')[0] ?? 'unknown'}:${sender?.split('@')[0] ?? 'unknown'}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+    }
+  }
+};
+
+const quotedFake = await generateWAMessage('254700000001@s.whatsapp.net', {
+  text: 'Quoted bot reply'
+}, {
+  userJid: '254700000000@s.whatsapp.net',
+  quoted: userContactMessage
+});
+const quotedCtx = quotedFake.message.extendedTextMessage.contextInfo;
+assert.equal(quotedCtx.participant, '0@s.whatsapp.net');
+assert.equal(quotedCtx.remoteJid, 'status@broadcast');
+assert.ok(typeof quotedCtx.stanzaId === 'string' && quotedCtx.stanzaId.length > 0);
+assert.equal(quotedCtx.quotedMessage.contactMessage.displayName, 'chiethaa');
+
+// Test sending userContactMessage directly as message content
+const unwrappedContactMsg = await generateWAMessageContent(userContactMessage, {});
+assert.equal(unwrappedContactMsg.contactMessage.displayName, 'chiethaa');
+assert.ok(unwrappedContactMsg.contactMessage.vcard.includes('FN:chiethaa'));
+
+// Test sending single contact via { contact: ... }
+const singleContactMsg = await generateWAMessageContent({
+  contact: {
+    name: 'chiethaa',
+    number: '254700000000'
+  }
+}, {});
+assert.equal(singleContactMsg.contactMessage.displayName, 'chiethaa');
+assert.ok(singleContactMsg.contactMessage.vcard.includes('FN:chiethaa'));
+
+// Test sending multiple contacts via { contacts: [...] }
+const multiContactsMsg = await generateWAMessageContent({
+  contacts: [
+    { name: 'One', number: '254700000001' },
+    { name: 'Two', number: '254700000002' }
+  ]
+}, {});
+assert.equal(multiContactsMsg.contactsArrayMessage.contacts.length, 2);
+
 // Clean up/close socket connection so it doesn't keep the event loop open
 mockSock.end(new Error('Test cleanup'));
 
-console.log('Feature tests passed: buttons, replies, subscription guards, group participant/v2 functions, and forwarded reply options.');
+console.log('Feature tests passed: buttons, replies, subscription guards, group participant/v2 functions, forwarded reply options, and contact/fake-contact functions.');
