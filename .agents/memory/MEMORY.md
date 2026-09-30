@@ -1,0 +1,1 @@
+- [Protocol test setup](protocol-test-setup.md) — Generate the checked-out protocol artifacts before running the Node test scripts.
