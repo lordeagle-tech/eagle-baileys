@@ -67,7 +67,6 @@ await socket.sendFakeContact(jid, 'Hello from bot!', {
 ### 2. Quick-Reply Buttons
 
 Send 1 to 3 interactive quick-reply buttons with text or media headers:
-
 ```js
 import { getButtonReplyInfo } from '@lordeagle21/baileys'
 
@@ -91,7 +90,167 @@ socket.ev.on('messages.upsert', ({ messages }) => {
 })
 ```
 
-### 3. Pairing Code
+### 3. Interactive CTA Rows
+
+Unlike quick replies (max 3), CTA rows accept any number of rows and each row can be a different action type — quick reply, URL, call, copy coupon, product, or flow:
+
+```js
+import { getCtaReplyInfo } from '@lordeagle21/baileys'
+
+await socket.sendInteractiveRows(jid, {
+  text: 'Track your order',
+  title: 'Delivery',
+  footer: 'Lordeagle Baileys',
+  interactiveRows: [
+    { type: 'quick_reply', id: 'track', displayText: 'Track order' },
+    { type: 'url', displayText: 'Open site', url: 'https://example.com/track' },
+    { type: 'call', displayText: 'Call us', phoneNumber: '+254700000000' },
+    { type: 'copy', displayText: 'Copy code', couponCode: 'EAGLE10' },
+  ],
+})
+
+// Parse the tapped row
+socket.ev.on('messages.upsert', ({ messages }) => {
+  const cta = getCtaReplyInfo(messages[0])
+  if (cta) {
+    console.log(`Row tapped: ${cta.type} / ${cta.id ?? cta.url ?? cta.phoneNumber ?? ''}`)
+  }
+})
+```
+
+Product headers work here too, exactly like quick-reply buttons:
+
+```js
+await socket.sendInteractiveRows(jid, {
+  text: 'Buy now',
+  product: { productId: 'p-1', title: 'Eagle Tee', productImage: './tee.jpg' },
+  interactiveRows: [{ type: 'quick_reply', id: 'buy', displayText: 'Buy' }],
+})
+```
+
+### 4. Native List Messages
+
+Send a WhatsApp single-select list with sections and rows (max 10 sections, max 10 rows each):
+
+```js
+import { getListReplyInfo } from '@lordeagle21/baileys'
+
+await socket.sendList(jid, {
+  title: 'Main Menu',
+  description: 'Choose a department',
+  buttonText: 'Open',
+  footer: 'Support',
+  sections: [
+    {
+      title: 'Sales',
+      rows: [
+        { id: 'new_order', title: 'New order', description: 'Start an order' },
+        { id: 'track_order', title: 'Track order' },
+      ],
+    },
+    { title: 'Support', rows: [{ id: 'help', title: 'Talk to a human' }] },
+  ],
+})
+
+// Or use a flat list without sections
+await socket.sendList(jid, { title: 'Flat Menu', rows: [{ id: 'one', title: 'One' }] })
+
+// Parse the selected row
+socket.ev.on('messages.upsert', ({ messages }) => {
+  const list = getListReplyInfo(messages[0])
+  if (list) {
+    console.log(`Selected row: ${list.rowId}`)
+  }
+})
+```
+
+### 5. Reactions, Edits & Polls
+
+```js
+// React to any message
+await socket.sendReaction(jid, message.key, '👍')
+
+// Remove a reaction (send an empty string)
+await socket.removeReaction(jid, message.key)
+
+// Edit a previously sent text message
+await socket.editMessage(jid, message.key, { text: 'Corrected text' })
+
+// Create a poll
+await socket.sendMessage(jid, {
+  poll: {
+    name: 'Lunch?',
+    values: ['Pizza', 'Sushi', 'Salad'],
+  },
+})
+
+// Quiz poll with a correct answer
+await socket.sendMessage(jid, {
+  poll: {
+    name: '2 + 2?',
+    values: ['3', '4'],
+    selectableCount: 1,
+    pollType: 'QUIZ',
+    correctAnswer: '4',
+  },
+})
+```
+
+### 6. Status & Newsletter
+
+```js
+// Post a status update visible to the given contacts
+await socket.sendStatus({ text: 'Bot is online!' }, [
+  '254700000000',
+  '254700000001',
+])
+
+// Send to a WhatsApp channel (newsletter)
+await socket.sendNewsletterMessage('120363322464215140@newsletter', {
+  text: 'New release!',
+})
+```
+
+### 7. Linked Devices
+
+When you pair via a pairing code, WhatsApp normally pushes a "you linked this device" alert to the owner's phone. That alert is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag. This library requests it on both the `companion_hello` and `companion_finish` pairing stages, so the request is present at the moment the device actually gets linked:
+
+```js
+const socket = makeWASocket({
+  auth: state,
+  pairingCode: 'NICKCORP',
+  showPairingPushNotification: true, // default; set false to request no push
+})
+```
+
+Two things to keep in mind:
+
+- The alert only fires for a **genuinely new** device. Reusing an existing auth folder means the server sees a reconnect of a known session, so no alert — test with a fresh folder to see it once.
+- If the server-side alert is unreliable in your setup, you can have the bot send its own. The library reports every device change:
+
+```js
+// Fires when a device is paired to the account
+socket.ev.on('devices.link', ([{ devices }]) => {
+  console.log('New device linked:', devices)
+  // e.g. notify the owner: await socket.sendMessage(ownerJid, { text: 'New device linked!' })
+})
+
+// Fires when a device is unlinked
+socket.ev.on('devices.unlink', ([{ devices }]) => {
+  console.log('Device unlinked:', devices)
+})
+
+// Any device list change
+socket.ev.on('devices.update', ([{ tag, devices }]) => {
+  console.log(`Device list ${tag}:`, devices)
+})
+
+// Or poll the current linked device list on demand
+const devices = await socket.getLinkedDevices()
+console.log(devices.map(d => d.id))
+```
+
+### 8. Pairing Code
 
 Connect without scanning a QR code using an 8-character pairing code:
 
@@ -105,7 +264,7 @@ const code = await socket.requestPairingCode('254700000000')
 console.log(`Pairing code: ${code}`)
 ```
 
-### 4. JID Normalization & Aliases
+### 9. JID Normalization & Aliases
 
 Normalize phone numbers and set local aliases:
 
