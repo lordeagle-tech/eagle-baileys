@@ -281,6 +281,8 @@ const code = await socket.requestPairingCode('254700000000')
 console.log(`Pairing code: ${code}`)
 ```
 
+Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `NICK-CORP` are normalized before use, so keep the raw code for retries and add a separator only when displaying it.
+
 ### 9. JID Normalization & Aliases
 
 Normalize phone numbers and set local aliases:
