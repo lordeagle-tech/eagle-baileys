@@ -211,7 +211,24 @@ await socket.sendNewsletterMessage('120363322464215140@newsletter', {
 })
 ```
 
-### 7. Linked Devices
+### 7. Bot HTML Responses
+
+The library also supports WhatsApp bot-style HTML payloads that render as a forwarded bot response:
+
+```js
+await socket.sendHtml(jid, `
+  <h1>Welcome</h1>
+  <p>Your bot is online.</p>
+  <a href="https://example.com">Open dashboard</a>
+`)
+
+// Or use the alias with a clearer bot-specific name
+await socket.sendBotHtml(jid, '<strong>Live</strong> updates are enabled.')
+```
+
+These messages carry a `richResponseMessage` payload with `FOAHtmlPrimitiveDemoDONOTUSE`, which is the same structure used by the bot HTML payloads in WhatsApp's internal clients.
+
+### 8. Linked Devices
 
 When you pair via a pairing code, WhatsApp normally pushes a "you linked this device" alert to the owner's phone. That alert is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag. This library requests it on both the `companion_hello` and `companion_finish` pairing stages, so the request is present at the moment the device actually gets linked:
 
