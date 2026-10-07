@@ -1,8 +1,37 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
+import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePhoneNumber } from '../lib/index.js';
+
+const rejectedUpgradeServer = createServer((_request, response) => {
+  response.writeHead(403);
+  response.end('WebSocket upgrade rejected');
+});
+await new Promise((resolve, reject) => {
+  rejectedUpgradeServer.once('error', reject);
+  rejectedUpgradeServer.listen(0, '127.0.0.1', resolve);
+});
+const rejectedUpgradeAddress = rejectedUpgradeServer.address();
+const rejectedUpgradeClient = new WebSocketClient(
+  new URL(`ws://127.0.0.1:${rejectedUpgradeAddress.port}`),
+  { connectTimeoutMs: 1000 }
+);
+const rejectedUpgradeErrorPromise = new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => reject(new Error('Timed out waiting for rejected WebSocket upgrade')), 3000);
+  rejectedUpgradeClient.once('error', error => {
+    clearTimeout(timeout);
+    resolve(error);
+  });
+});
+rejectedUpgradeClient.connect();
+const rejectedUpgradeError = await rejectedUpgradeErrorPromise;
+assert.match(rejectedUpgradeError.message, /Unexpected server response: 403/);
+await new Promise((resolve, reject) => {
+  rejectedUpgradeServer.close(error => error ? reject(error) : resolve());
+});
 
 assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
 // the "device linked" push request must stay on by default for pairing codes
