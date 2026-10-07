@@ -4,7 +4,7 @@ import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePhoneNumber } from '../lib/index.js';
+import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber } from '../lib/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
   response.writeHead(403);
@@ -34,6 +34,12 @@ await new Promise((resolve, reject) => {
 });
 
 assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
+assert.equal(normalizePairingCode('NICKCORP'), 'NICKCORP');
+assert.equal(normalizePairingCode('NICK-CORP'), 'NICKCORP');
+assert.equal(normalizePairingCode('NICK--CORP'), 'NICKCORP');
+assert.equal(normalizePairingCode('nick corp'), 'NICKCORP');
+assert.throws(() => normalizePairingCode('NICK-COR'), /exactly 8 letters or digits/);
+assert.throws(() => normalizePairingCode('NICK/CORP'), /exactly 8 letters or digits/);
 // the "device linked" push request must stay on by default for pairing codes
 assert.equal(DEFAULT_CONNECTION_CONFIG.showPairingPushNotification, true);
 assert.equal(normalizePhoneNumber('+254 (700) 000-000'), '254700000000');
