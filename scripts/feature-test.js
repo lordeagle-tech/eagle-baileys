@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
-import { createFakeContact, generateVCard, generateWAMessage, generateWAMessageContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
+import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePhoneNumber } from '../lib/index.js';
 
 assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
@@ -490,6 +490,39 @@ assert.equal(imageButtons.interactiveMessage.body.text, 'Image buttons');
 assert.equal(imageButtons.interactiveMessage.header.hasMediaAttachment, true);
 assert.ok(imageButtons.interactiveMessage.header.imageMessage);
 
+// Bot HTML rich responses
+const htmlResponse = generateBotHtmlResponse('  <h1>Hello</h1>  ', {
+  responseId: 'html-response-id',
+  contextInfo: { stanzaId: 'quoted-message-id' }
+});
+const encodedHtmlResponse = htmlResponse.botForwardedMessage.message.richResponseMessage;
+assert.equal(encodedHtmlResponse.messageType, 1);
+assert.equal(encodedHtmlResponse.contextInfo.isForwarded, true);
+assert.equal(encodedHtmlResponse.contextInfo.forwardOrigin, 4);
+assert.equal(encodedHtmlResponse.contextInfo.stanzaId, 'quoted-message-id');
+assert.deepEqual(JSON.parse(Buffer.from(encodedHtmlResponse.unifiedResponse.data, 'base64').toString()), {
+  __typename: 'GenAIUnifiedResponse',
+  response_id: 'html-response-id',
+  sections: [{
+    __typename: 'GenAIUnifiedResponseSection',
+    view_model: {
+      __typename: 'GenAISingleLayoutViewModel',
+      primitive: {
+        __typename: 'FOAHtmlPrimitiveDemoDONOTUSE',
+        trusted_sources: [],
+        payload: '<h1>Hello</h1>'
+      }
+    }
+  }]
+});
+assert.ok(proto.Message.encode(generateWAMessageFromContent('254700000000@s.whatsapp.net', htmlResponse, {}).message).finish().length > 0);
+const generatedHtmlResponseId = JSON.parse(Buffer.from(
+  generateBotHtmlResponse('<p>UUID</p>').botForwardedMessage.message.richResponseMessage.unifiedResponse.data,
+  'base64'
+).toString()).response_id;
+assert.match(generatedHtmlResponseId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+assert.throws(() => generateBotHtmlResponse(' \n '), /non-empty HTML content/);
+
 // Test socket connection properties and ping exports
 const mockSock = makeWASocket({
   auth: {
@@ -574,10 +607,13 @@ assert.ok(typeof mockSock.sendList === 'function');
 assert.ok(typeof mockSock.sendInteractiveRows === 'function');
 assert.ok(typeof mockSock.sendStatus === 'function');
 assert.ok(typeof mockSock.sendNewsletterMessage === 'function');
+assert.ok(typeof mockSock.sendHtml === 'function');
+assert.ok(typeof mockSock.sendBotHtml === 'function');
 assert.ok(typeof mockSock.getLinkedDevices === 'function');
 
 // Newsletter send must reject non-newsletter JIDs
 await assert.rejects(() => mockSock.sendNewsletterMessage('254700000000@s.whatsapp.net', { text: 'hi' }), /@newsletter JID/);
+await assert.rejects(() => mockSock.sendHtml('254700000000@s.whatsapp.net', '  '), /non-empty HTML content/);
 
 // Reaction send must reject bad input
 await assert.rejects(() => mockSock.sendReaction('254700000000@s.whatsapp.net', undefined, '👍'), /requires a message key/);
