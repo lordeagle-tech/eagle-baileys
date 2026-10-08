@@ -363,6 +363,42 @@ const KIND = [{
   k: 'varint',
   s: 'zigzaglong'
 }];
+const isByteLike = v => v instanceof Uint8Array;
+const isLongLike = v => typeof v.low === 'number' && typeof v.high === 'number' && typeof v.unsigned === 'boolean' && typeof v.toString === 'function';
+const jsonSafe = v => {
+  if (v === null || v === undefined) return v;
+  if (typeof v !== 'object') return v;
+  if (isByteLike(v)) return Buffer.from(v.buffer, v.byteOffset, v.byteLength).toString('base64');
+  if (Array.isArray(v)) return v.map(jsonSafe);
+  if (isLongLike(v)) return v.toString();
+  const out = {};
+  for (const k of Object.keys(v)) {
+    if (k === 'toJSON') continue;
+    out[k] = jsonSafe(v[k]);
+  }
+  return out;
+};
+const attachToJSON = (v, seen) => {
+  if (!v || typeof v !== 'object') return v;
+  if (Array.isArray(v)) {
+    for (const item of v) attachToJSON(item, seen);
+    return v;
+  }
+  if (isByteLike(v)) return v;
+  if (typeof v.toJSON === 'function') return v;
+  if (seen.has(v)) return v;
+  seen.add(v);
+  Object.defineProperty(v, 'toJSON', {
+    value: function () {
+      return jsonSafe(this);
+    },
+    enumerable: false,
+    configurable: true,
+    writable: true
+  });
+  for (const k of Object.keys(v)) attachToJSON(v[k], seen);
+  return v;
+};
 function makeProto(tablePath) {
   const {
     m,
@@ -408,10 +444,10 @@ function makeProto(tablePath) {
     node.encode = o => ({
       finish: () => codec.encode(full, o || {})
     });
-    node.decode = b => codec.decode(full, b);
-    node.create = o => o || {};
-    node.fromObject = o => o || {};
-    node.toObject = o => o || {};
+    node.decode = b => attachToJSON(codec.decode(full, b), new Set());
+    node.create = o => attachToJSON(o || {}, new Set());
+    node.fromObject = o => attachToJSON(o || {}, new Set());
+    node.toObject = o => attachToJSON(o || {}, new Set());
     node.verify = () => null;
     node.name = full.split('.').pop();
   }
