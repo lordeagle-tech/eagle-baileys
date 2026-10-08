@@ -25,7 +25,7 @@ const { state, saveCreds } = await useMultiFileAuthState('auth_info')
 
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NICKCORP', // Default 8-character pairing code
+  pairingCode: 'EAGLE21X', // Default 8-character pairing code
 })
 
 socket.ev.on('creds.update', saveCreds)
@@ -230,15 +230,17 @@ These messages carry a `richResponseMessage` payload with `FOAHtmlPrimitiveDemoD
 
 ### 8. Linked Devices
 
-When you pair via a pairing code, WhatsApp normally pushes a "you linked this device" alert to the owner's phone. That alert is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag. This library requests it on both the `companion_hello` and `companion_finish` pairing stages, so the request is present at the moment the device actually gets linked:
+When you pair via a pairing code, WhatsApp normally pushes a "you linked this device" alert to the owner's phone. That alert is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag. This library requests it on the `companion_hello` pairing stage:
 
 ```js
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NICKCORP',
+  pairingCode: 'EAGLE21X',
   showPairingPushNotification: true, // default; set false to request no push
 })
 ```
+
+The flag is deliberately **not** repeated on `companion_finish`. That stage is sent with exactly `jid` and `stage` — the same minimal payload upstream Baileys sends — so nothing outside the known-good schema can make the server drop the finish reply after the code has already been accepted on the phone.
 
 Two things to keep in mind:
 
@@ -274,14 +276,16 @@ Connect without scanning a QR code using an 8-character pairing code:
 ```js
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NICKCORP',
+  pairingCode: 'EAGLE21X',
 })
 
 const code = await socket.requestPairingCode('254700000000')
 console.log(`Pairing code: ${code}`)
 ```
 
-Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `NICK-CORP` are normalized before use, so keep the raw code for retries and add a separator only when displaying it.
+Pairing codes must be exactly 8 characters drawn from `123456789ABCDEFGHJKLMNPQRSTVWXYZ` (Crockford base32 — no `0`, `I`, `O` or `U`). The key is derived with PBKDF2 over the exact string, so a character the phone reinterprets produces a different key on each side and the link silently never completes; `normalizePairingCode` rejects anything outside that set rather than letting it fail later.
+
+Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `EAGLE-21X` are normalized before use, so keep the raw code for retries and add a separator only when displaying it.
 
 ### 9. JID Normalization & Aliases
 

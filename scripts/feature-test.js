@@ -33,13 +33,19 @@ await new Promise((resolve, reject) => {
   rejectedUpgradeServer.close(error => error ? reject(error) : resolve());
 });
 
-assert.equal(DEFAULT_PAIRING_CODE, 'NICKCORP');
-assert.equal(normalizePairingCode('NICKCORP'), 'NICKCORP');
-assert.equal(normalizePairingCode('NICK-CORP'), 'NICKCORP');
-assert.equal(normalizePairingCode('NICK--CORP'), 'NICKCORP');
-assert.equal(normalizePairingCode('nick corp'), 'NICKCORP');
-assert.throws(() => normalizePairingCode('NICK-COR'), /exactly 8 letters or digits/);
-assert.throws(() => normalizePairingCode('NICK/CORP'), /exactly 8 letters or digits/);
+assert.equal(DEFAULT_PAIRING_CODE, 'EAGLE21X');
+assert.equal(DEFAULT_CONNECTION_CONFIG.pairingCode, DEFAULT_PAIRING_CODE);
+assert.equal(normalizePairingCode('EAGLE21X'), 'EAGLE21X');
+assert.equal(normalizePairingCode('EAGLE-21X'), 'EAGLE21X');
+assert.equal(normalizePairingCode('EAGLE--21X'), 'EAGLE21X');
+assert.equal(normalizePairingCode('eagle 21x'), 'EAGLE21X');
+assert.throws(() => normalizePairingCode('EAGLE-21'), /exactly 8 characters/);
+assert.throws(() => normalizePairingCode('EAGLE/21X'), /exactly 8 characters/);
+// pairing codes must stay inside the Crockford alphabet WhatsApp derives the
+// key from — 0, I, O and U are silently reinterpreted by the phone otherwise
+assert.throws(() => normalizePairingCode('NICKCORP'), /no 0, I, O or U/);
+assert.throws(() => normalizePairingCode('ABCDEFGO'), /no 0, I, O or U/);
+assert.equal(normalizePairingCode('EAGLE21A'), 'EAGLE21A');
 // the "device linked" push request must stay on by default for pairing codes
 assert.equal(DEFAULT_CONNECTION_CONFIG.showPairingPushNotification, true);
 assert.equal(normalizePhoneNumber('+254 (700) 000-000'), '254700000000');
