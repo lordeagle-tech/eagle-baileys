@@ -39,6 +39,22 @@ socket.ev.on('messages.upsert', async ({ messages }) => {
 })
 ```
 
+### Connection Helpers
+
+`connectionState` / `isConnected` expose the current state, and `waitForConnection()` resolves once the bot is online instead of wiring up a listener yourself:
+
+```js
+console.log(socket.connectionState) // 'connecting' | 'open' | 'close'
+console.log(socket.isConnected)     // boolean
+
+await socket.waitForConnection()          // waits for connection: 'open'
+await socket.waitForConnection(30_000)    // optional timeout in ms
+
+// Run a callback on every open (including reconnects); returns an unsubscribe fn
+const off = socket.onConnected(() => console.log('bot is online'))
+// off()
+```
+
 ## Bot Features
 
 ### 1. Contact & Fake Contact Quote (`fkon`)
@@ -66,11 +82,12 @@ await socket.sendFakeContact(jid, 'Hello from bot!', {
 
 ### 2. Quick-Reply Buttons
 
-Send 1 to 3 interactive quick-reply buttons with text or media headers:
+Send interactive quick-reply buttons with text or media headers. Up to 3 buttons render as native quick replies; pass more than 3 and the library automatically falls back to native-flow rows, so you can keep using `buttons` regardless of count:
+
 ```js
 import { getButtonReplyInfo } from '@lordeagle21/baileys'
 
-// Send text buttons
+// 1-3 buttons: native quick replies
 await socket.sendMessage(jid, {
   text: 'Choose an option below:',
   title: 'Automation',
@@ -81,7 +98,18 @@ await socket.sendMessage(jid, {
   ],
 })
 
-// Listen for button replies
+// More than 3 buttons: same API, sent as native-flow rows
+await socket.sendMessage(jid, {
+  text: 'Pick a department:',
+  buttons: [
+    { id: 'sales', displayText: 'Sales' },
+    { id: 'support', displayText: 'Support' },
+    { id: 'billing', displayText: 'Billing' },
+    { id: 'other', displayText: 'Other' },
+  ],
+})
+
+// Listen for button replies (works for both shapes)
 socket.ev.on('messages.upsert', ({ messages }) => {
   const reply = getButtonReplyInfo(messages[0])
   if (reply) {
@@ -92,7 +120,7 @@ socket.ev.on('messages.upsert', ({ messages }) => {
 
 ### 3. Interactive CTA Rows
 
-Unlike quick replies (max 3), CTA rows accept any number of rows and each row can be a different action type — quick reply, URL, call, copy coupon, product, or flow:
+CTA rows accept any number of rows and each row can be a different action type — quick reply, URL, call, copy coupon, product, or flow:
 
 ```js
 import { getCtaReplyInfo } from '@lordeagle21/baileys'
@@ -230,13 +258,13 @@ These messages carry a `richResponseMessage` payload with `FOAHtmlPrimitiveDemoD
 
 ### 8. Linked Devices
 
-When you pair via a pairing code, WhatsApp normally pushes a "you linked this device" alert to the owner's phone. That alert is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag. This library requests it on the `companion_hello` pairing stage:
+When `requestPairingCode()` generates a code, WhatsApp normally shows a "link a device" notification on the owner's phone. That notification is produced by WhatsApp's servers — a client library can only *request* it, via the `should_show_push_notification` flag on the `companion_hello` (pair-code) stage. It is requested by default:
 
 ```js
 const socket = makeWASocket({
   auth: state,
   pairingCode: 'EAGLE21X',
-  showPairingPushNotification: true, // default; set false to request no push
+  showPairingPushNotification: true, // default; set false to request no notification
 })
 ```
 
@@ -282,6 +310,8 @@ const socket = makeWASocket({
 const code = await socket.requestPairingCode('254700000000')
 console.log(`Pairing code: ${code}`)
 ```
+
+`requestPairingCode` can be called immediately after `makeWASocket` — even before the WebSocket is open. It waits for the connection, then sends the pairing handshake once the server is ready, so bots no longer need a manual delay or `waitForSocketOpen`.
 
 Pairing codes must be exactly 8 characters drawn from `123456789ABCDEFGHJKLMNPQRSTVWXYZ` (Crockford base32 — no `0`, `I`, `O` or `U`). The key is derived with PBKDF2 over the exact string, so a character the phone reinterprets produces a different key on each side and the link silently never completes; `normalizePairingCode` rejects anything outside that set rather than letting it fail later.
 
