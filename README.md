@@ -25,7 +25,7 @@ const { state, saveCreds } = await useMultiFileAuthState('auth_info')
 
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'EAGLE21X', // Default 8-character pairing code
+  pairingCode: 'EAGLE21X', // 8-character pairing code (see Pairing Code below)
 })
 
 socket.ev.on('creds.update', saveCreds)
@@ -312,6 +312,12 @@ console.log(`Pairing code: ${code}`)
 ```
 
 `requestPairingCode` can be called immediately after `makeWASocket` — even before the WebSocket is open. It waits for the connection, then sends the pairing handshake once the server is ready, so bots no longer need a manual delay or `waitForSocketOpen`.
+
+The code comes from the per-call argument or `pairingCode` in the socket config, in that order. `EAGLE21X` is the value of `DEFAULT_CONNECTION_CONFIG.pairingCode`, so a socket created with `makeWASocket` always has one; `requestPairingCode` itself has no hidden fallback and throws a clear error if the resolved config has no code. Pass the code explicitly to be safe:
+
+```js
+const code = await socket.requestPairingCode('254700000000', 'EAGLE21X')
+```
 
 Pairing codes must be exactly 8 characters drawn from `123456789ABCDEFGHJKLMNPQRSTVWXYZ` (Crockford base32 — no `0`, `I`, `O` or `U`). The key is derived with PBKDF2 over the exact string, so a character the phone reinterprets produces a different key on each side and the link silently never completes; `normalizePairingCode` rejects anything outside that set rather than letting it fail later.
 

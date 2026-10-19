@@ -4,7 +4,7 @@ import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, shouldShowPairingPushNotification } from '../lib/index.js';
+import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, shouldShowPairingPushNotification } from '../lib/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
   response.writeHead(403);
@@ -35,6 +35,13 @@ await new Promise((resolve, reject) => {
 
 assert.equal(DEFAULT_PAIRING_CODE, 'EAGLE21X');
 assert.equal(DEFAULT_CONNECTION_CONFIG.pairingCode, DEFAULT_PAIRING_CODE);
+// config is the only fallback; the call argument wins, and a missing code is
+// an explicit error rather than a silent hardcoded default
+assert.equal(resolvePairingCode({ pairingCode: 'EAGLE21X' }), 'EAGLE21X');
+assert.equal(resolvePairingCode({ pairingCode: 'EAGLE21X' }, 'ABCDEFGH'), 'ABCDEFGH');
+assert.equal(resolvePairingCode({}, 'eagle-21x'), 'EAGLE21X');
+assert.throws(() => resolvePairingCode({}), /requires a pairing code/);
+assert.throws(() => resolvePairingCode({}, ''), /requires a pairing code/);
 assert.equal(normalizePairingCode('EAGLE21X'), 'EAGLE21X');
 assert.equal(normalizePairingCode('EAGLE-21X'), 'EAGLE21X');
 assert.equal(normalizePairingCode('EAGLE--21X'), 'EAGLE21X');
