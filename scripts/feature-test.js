@@ -4,7 +4,7 @@ import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber } from '../lib/index.js';
+import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, shouldShowPairingPushNotification } from '../lib/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
   response.writeHead(403);
@@ -48,6 +48,10 @@ assert.throws(() => normalizePairingCode('ABCDEFGO'), /no 0, I, O or U/);
 assert.equal(normalizePairingCode('EAGLE21A'), 'EAGLE21A');
 // the "device linked" push request must stay on by default for pairing codes
 assert.equal(DEFAULT_CONNECTION_CONFIG.showPairingPushNotification, true);
+// the pairing-code "link a device" notification is requested by default
+assert.equal(shouldShowPairingPushNotification(DEFAULT_CONNECTION_CONFIG), true);
+assert.equal(shouldShowPairingPushNotification({ showPairingPushNotification: false }), false);
+assert.equal(shouldShowPairingPushNotification({ showPairingPushNotification: true }), true);
 assert.equal(normalizePhoneNumber('+254 (700) 000-000'), '254700000000');
 assert.equal(normalizeJid('+254 700 000 000'), '254700000000@s.whatsapp.net');
 assert.equal(normalizeJid('12345@c.us'), '12345@s.whatsapp.net');
@@ -104,9 +108,11 @@ assert.deepEqual(JSON.parse(generatedFromLegacyFields.interactiveMessage.nativeF
 await assert.rejects(() => generateWAMessageContent({
   text: 'Choose',
   buttons: []
-}, {}), /between 1 and 3/);
+}, {}), /at least one/);
 
-await assert.rejects(() => generateWAMessageContent({
+// More than 3 buttons automatically fall back to native-flow rows instead of
+// being rejected, so bots can pass any number of quick replies.
+const manyButtons = await generateWAMessageContent({
   text: 'Choose',
   buttons: [{
     id: 'one',
@@ -121,7 +127,29 @@ await assert.rejects(() => generateWAMessageContent({
     id: 'four',
     displayText: 'Four'
   }]
-}, {}), /between 1 and 3/);
+}, {});
+assert.equal(manyButtons.interactiveMessage.nativeFlowMessage.buttons.length, 4);
+assert.equal(manyButtons.interactiveMessage.nativeFlowMessage.buttons[0].name, 'quick_reply');
+assert.deepEqual(JSON.parse(manyButtons.interactiveMessage.nativeFlowMessage.buttons[3].buttonParamsJson), {
+  display_text: 'Four',
+  id: 'four'
+});
+assert.ok(proto.Message.encode(manyButtons).finish().length > 0);
+
+// Mixed button types beyond 3 keep their CTA action when falling back
+const mixedButtons = await generateWAMessageContent({
+  text: 'Choose',
+  buttons: [
+    { id: 'one', displayText: 'One' },
+    { id: 'two', displayText: 'Two' },
+    { id: 'three', displayText: 'Three' },
+    { displayText: 'Open site', url: 'https://example.com' },
+    { displayText: 'Call us', phoneNumber: '+254700000000' }
+  ]
+}, {});
+assert.equal(mixedButtons.interactiveMessage.nativeFlowMessage.buttons.length, 5);
+assert.equal(mixedButtons.interactiveMessage.nativeFlowMessage.buttons[3].name, 'cta_url');
+assert.equal(mixedButtons.interactiveMessage.nativeFlowMessage.buttons[4].name, 'cta_call');
 
 await assert.rejects(() => generateWAMessageContent({
   text: 'Choose',
@@ -599,6 +627,15 @@ const mockSock = makeWASocket({
 
 assert.equal(mockSock.connectionState, 'connecting');
 assert.equal(mockSock.isConnected, false);
+assert.ok(typeof mockSock.waitForConnection === 'function');
+assert.ok(typeof mockSock.onConnected === 'function');
+assert.ok(typeof mockSock.waitForConnectionUpdate === 'function');
+let onConnectedCalls = 0;
+const unsubscribeConnected = mockSock.onConnected(() => {
+  onConnectedCalls += 1;
+});
+assert.equal(typeof unsubscribeConnected, 'function');
+unsubscribeConnected();
 assert.ok(typeof mockSock.groupParticipantsAdd === 'function');
 assert.ok(typeof mockSock.groupParticipantsRemove === 'function');
 assert.ok(typeof mockSock.groupParticipantsPromote === 'function');

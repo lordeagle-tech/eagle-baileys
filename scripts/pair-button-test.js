@@ -63,7 +63,8 @@ const waitForRegistration = () => new Promise((resolve, reject) => {
 try {
   const registrationPromise = waitForRegistration();
   registrationPromise.catch(() => {});
-  await socket.waitForSocketOpen();
+  // Bots call this straight after makeWASocket; the socket now waits for the
+  // connection itself instead of throwing "Connection Closed".
   const pairingCode = await socket.requestPairingCode(phoneNumber);
 
   console.log(`Temporary WhatsApp pairing code: ${pairingCode}`);
