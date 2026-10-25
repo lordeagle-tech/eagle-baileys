@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
-import { createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
+import { BOT_HTML_RENDERING_CONFIG, createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, shouldShowPairingPushNotification } from '../lib/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
@@ -280,6 +280,81 @@ assert.deepEqual(JSON.parse(ctaButtons[2].buttonParamsJson), { display_text: 'Ca
 assert.equal(ctaButtons[3].name, 'cta_copy');
 assert.deepEqual(JSON.parse(ctaButtons[3].buttonParamsJson), { display_text: 'Copy code', coupon_code: 'EAGLE10' });
 assert.ok(proto.Message.encode(ctaRows).finish().length > 0);
+
+// Advanced native-flow button types supported by gifted-btns
+const advancedRows = await generateWAMessageContent({
+  text: 'Advanced actions',
+  interactiveRows: [
+    { type: 'cta_reminder', displayText: 'Remind me' },
+    { type: 'cta_cancel_reminder', displayText: 'Cancel reminder' },
+    { type: 'address_message', displayText: 'Address' },
+    { type: 'send_location', displayText: 'Location' },
+    { type: 'open_webview', title: 'Open page', link: { url: 'https://example.com/app' } },
+    { type: 'catalog', businessPhoneNumber: '+254700000001' },
+    { type: 'mpm', displayText: 'Products', productId: 'p-1', catalogId: 'c-1' },
+    { type: 'wa_payment_transaction_details', transactionId: 'txn-1' },
+    { type: 'automated_greeting_message_view_catalog', businessPhoneNumber: '+254700000002', catalogProductId: 'cp-1' },
+    { type: 'galaxy_message', flowToken: 'flow-token', flowId: 'flow-id' },
+    { type: 'single_select', title: 'Pick one', sections: [{ title: 'Choices', rows: [{ id: 'a', title: 'Alpha' }] }] },
+    { type: 'review_and_pay', params: { order_id: 'order-1' } },
+    { type: 'payment_info', displayText: 'Payment details' },
+    { type: 'call_permission_request', displayText: 'Allow calls' }
+  ]
+}, {});
+const advancedButtons = advancedRows.interactiveMessage.nativeFlowMessage.buttons;
+assert.deepEqual(advancedButtons.map(button => button.name), [
+  'cta_reminder', 'cta_cancel_reminder', 'address_message', 'send_location',
+  'open_webview', 'cta_catalog', 'mpm', 'wa_payment_transaction_details',
+  'automated_greeting_message_view_catalog', 'galaxy_message', 'single_select',
+  'review_and_pay', 'payment_info', 'call_permission_request'
+]);
+assert.deepEqual(JSON.parse(advancedButtons[4].buttonParamsJson), {
+  title: 'Open page',
+  link: { url: 'https://example.com/app' }
+});
+assert.deepEqual(JSON.parse(advancedButtons[5].buttonParamsJson), { business_phone_number: '+254700000001' });
+assert.deepEqual(JSON.parse(advancedButtons[6].buttonParamsJson), { display_text: 'Products', product_id: 'p-1', catalog_id: 'c-1' });
+assert.deepEqual(JSON.parse(advancedButtons[7].buttonParamsJson), { transaction_id: 'txn-1' });
+assert.deepEqual(JSON.parse(advancedButtons[8].buttonParamsJson), { business_phone_number: '+254700000002', catalog_product_id: 'cp-1' });
+assert.deepEqual(JSON.parse(advancedButtons[9].buttonParamsJson), { flow_token: 'flow-token', flow_id: 'flow-id' });
+assert.deepEqual(JSON.parse(advancedButtons[10].buttonParamsJson), {
+  title: 'Pick one',
+  sections: [{ title: 'Choices', rows: [{ id: 'a', title: 'Alpha' }] }]
+});
+assert.deepEqual(JSON.parse(advancedButtons[11].buttonParamsJson), { order_id: 'order-1' });
+assert.ok(proto.Message.encode(advancedRows).finish().length > 0);
+
+// Raw gifted-btns style interactiveButtons payloads pass through untouched
+const rawInteractive = await generateWAMessageContent({
+  text: 'Raw native flow',
+  interactiveButtons: [
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'Hi', id: 'hi' }) },
+    { name: 'cta_reminder', buttonParamsJson: JSON.stringify({ display_text: 'Remind' }) }
+  ]
+}, {});
+assert.deepEqual(rawInteractive.interactiveMessage.nativeFlowMessage.buttons, [
+  { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'Hi', id: 'hi' }) },
+  { name: 'cta_reminder', buttonParamsJson: JSON.stringify({ display_text: 'Remind' }) }
+]);
+
+const legacyInteractive = await generateWAMessageContent({
+  text: 'Legacy interactive buttons',
+  interactiveButtons: [
+    { id: 'yes', text: 'Yes' },
+    { buttonId: 'no', buttonText: { displayText: 'No' } },
+    { text: 'Default id' }
+  ]
+}, {});
+assert.deepEqual(legacyInteractive.interactiveMessage.nativeFlowMessage.buttons, [
+  { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'Yes', id: 'yes' }) },
+  { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'No', id: 'no' }) },
+  { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'Default id', id: 'quick_3' }) }
+]);
+
+await assert.rejects(() => generateWAMessageContent({
+  text: 'Bad raw button',
+  interactiveButtons: [{ name: 'not_a_flow', buttonParamsJson: '{}' }]
+}, {}), /not a supported native flow type/);
 
 // CTA rows accept a product reference as header
 const ctaProductRows = await generateWAMessageContent({
@@ -592,12 +667,45 @@ assert.deepEqual(JSON.parse(Buffer.from(encodedHtmlResponse.unifiedResponse.data
   }]
 });
 assert.ok(proto.Message.encode(generateWAMessageFromContent('254700000000@s.whatsapp.net', htmlResponse, {}).message).finish().length > 0);
+assert.deepEqual(htmlResponse.messageContextInfo.botMetadata.botRenderingConfigMetadata, BOT_HTML_RENDERING_CONFIG);
+assert.deepEqual(htmlResponse.messageContextInfo.botMetadata.pluginMetadata, {});
+const trustedHtmlResponse = generateBotHtmlResponse({
+  html: '<p>Trusted</p>',
+  trustedSources: [' https://example.com/docs ', '', 7]
+});
+const trustedHtmlPayload = JSON.parse(Buffer.from(
+  trustedHtmlResponse.botForwardedMessage.message.richResponseMessage.unifiedResponse.data,
+  'base64'
+).toString());
+assert.deepEqual(trustedHtmlPayload.sections[0].view_model.primitive.trusted_sources, ['https://example.com/docs']);
+const richHtmlResponse = generateBotHtmlResponse({
+  title: 'Dashboard',
+  trustedSources: ['https://default.example'],
+  tabs: [
+    { id: 'one', tab_header: 'One', html: '<p>One</p>', trustedSources: ['https://one.example'] },
+    { title: 'Two', payload: '<p>Two</p>', url: 'https://two.example' }
+  ]
+});
+const richHtmlMessage = richHtmlResponse.botForwardedMessage.message.richResponseMessage;
+const richHtmlPayload = JSON.parse(Buffer.from(richHtmlMessage.unifiedResponse.data, 'base64').toString());
+assert.equal(richHtmlPayload.sections[0].view_model.primitive.text, '> Dashboard');
+assert.equal(richHtmlPayload.embedded_screens.length, 1);
+assert.equal(richHtmlPayload.embedded_screens[0].title, 'Dashboard');
+const richTabSheet = richHtmlPayload.embedded_screens[0].content[0];
+assert.equal(richTabSheet.__typename, 'FOAIDNixelButtonSheets');
+assert.equal(richTabSheet.tabs.length, 2);
+assert.equal(richTabSheet.tabs[0].sections[0].view_model.primitive.__typename, 'GenAIaeacdsnwHtmlPrimitive');
+assert.deepEqual(richTabSheet.tabs[0].sections[0].view_model.primitive.trusted_sources, ['https://one.example']);
+assert.equal(richTabSheet.tabs[1].sections[0].view_model.primitive.url, 'https://two.example');
+assert.equal(richTabSheet.tabs[1].tab_header, 'Two');
+assert.equal(richHtmlMessage.submessages[0].messageText, '> Dashboard');
 const generatedHtmlResponseId = JSON.parse(Buffer.from(
   generateBotHtmlResponse('<p>UUID</p>').botForwardedMessage.message.richResponseMessage.unifiedResponse.data,
   'base64'
 ).toString()).response_id;
 assert.match(generatedHtmlResponseId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 assert.throws(() => generateBotHtmlResponse(' \n '), /non-empty HTML content/);
+assert.throws(() => generateBotHtmlResponse({ tabs: [{ html: ' ' }] }), /non-empty HTML content/);
 
 // Test socket connection properties and ping exports
 const mockSock = makeWASocket({
@@ -694,11 +802,14 @@ assert.ok(typeof mockSock.sendStatus === 'function');
 assert.ok(typeof mockSock.sendNewsletterMessage === 'function');
 assert.ok(typeof mockSock.sendHtml === 'function');
 assert.ok(typeof mockSock.sendBotHtml === 'function');
+assert.ok(typeof mockSock.sendRichHtml === 'function');
+assert.ok(typeof mockSock.sendRichHtmlMessage === 'function');
 assert.ok(typeof mockSock.getLinkedDevices === 'function');
 
 // Newsletter send must reject non-newsletter JIDs
 await assert.rejects(() => mockSock.sendNewsletterMessage('254700000000@s.whatsapp.net', { text: 'hi' }), /@newsletter JID/);
 await assert.rejects(() => mockSock.sendHtml('254700000000@s.whatsapp.net', '  '), /non-empty HTML content/);
+await assert.rejects(() => mockSock.sendRichHtml('254700000000@s.whatsapp.net', '  '), /non-empty HTML content/);
 
 // Reaction send must reject bad input
 await assert.rejects(() => mockSock.sendReaction('254700000000@s.whatsapp.net', undefined, '👍'), /requires a message key/);
