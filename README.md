@@ -254,7 +254,27 @@ await socket.sendHtml(jid, `
 await socket.sendBotHtml(jid, '<strong>Live</strong> updates are enabled.')
 ```
 
-These messages carry a `richResponseMessage` payload with `FOAHtmlPrimitiveDemoDONOTUSE`, which is the same structure used by the bot HTML payloads in WhatsApp's internal clients.
+These messages carry a `richResponseMessage` payload with `FOAHtmlPrimitiveDemoDONOTUSE` plus the `botRenderingConfigMetadata` that WhatsApp Business clients require. After sending the rich envelope, the library replays it as a type-14 edit so compatible clients render it immediately instead of showing a Download prompt. Disable the compatibility replay with `{ renderRichResponse: false }`.
+
+Pass an object to supply trusted sources or multiple interactive tabs:
+
+```js
+await socket.sendHtml(jid, {
+  html: '<h1>Dashboard</h1>',
+  trustedSources: ['https://example.com']
+})
+
+await socket.sendRichHtml(jid, {
+  title: 'Status',
+  trustedSources: ['https://example.com'],
+  tabs: [
+    { id: 'summary', tab_header: 'Summary', html: '<p>All systems operational.</p>' },
+    { id: 'metrics', tab_header: 'Metrics', html: '<p>Uptime: 99.9%</p>', url: 'https://example.com/metrics' }
+  ]
+})
+```
+
+`sendRichHtmlMessage` is an alias for `sendRichHtml`.
 
 ### 8. Linked Devices
 
