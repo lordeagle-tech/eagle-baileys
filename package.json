@@ -20,6 +20,7 @@
   "license": "MIT",
   "author": "Lord Eagle",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "files": [
     "lib/**/*",
     "WAProto/**/*",
@@ -28,8 +29,10 @@
   "scripts": {
     "preinstall": "node ./engine-requirements.js",
     "prepare": "node WAProto/compiler.js",
+    "prepack": "node ./scripts/prepack-check.js",
     "smoke": "node ./scripts/smoke-test.js && node ./scripts/feature-test.js",
     "test": "node ./scripts/feature-test.js",
+    "test:release": "npm run smoke && npm run prepack && npm pack --dry-run",
     "test:buttons:pair": "node ./scripts/pair-button-test.js",
     "test:buttons:live": "node ./scripts/live-button-test.js"
   },

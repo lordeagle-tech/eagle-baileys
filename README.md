@@ -25,7 +25,7 @@ const { state, saveCreds } = await useMultiFileAuthState('auth_info')
 
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NCKTECH1', // 8-character pairing code (see Pairing Code below)
+  // Omit pairingCode to generate a fresh secure code per request
 })
 
 socket.ev.on('creds.update', saveCreds)
@@ -283,7 +283,6 @@ When `requestPairingCode()` generates a code, WhatsApp normally shows a "link a 
 ```js
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NCKTECH1',
   showPairingPushNotification: true, // default; set false to request no notification
 })
 ```
@@ -324,7 +323,6 @@ Connect without scanning a QR code using an 8-character pairing code:
 ```js
 const socket = makeWASocket({
   auth: state,
-  pairingCode: 'NCKTECH1',
 })
 
 const code = await socket.requestPairingCode('254700000000')
@@ -333,15 +331,26 @@ console.log(`Pairing code: ${code}`)
 
 `requestPairingCode` can be called immediately after `makeWASocket` — even before the WebSocket is open. It waits for the connection, then sends the pairing handshake once the server is ready, so bots no longer need a manual delay or `waitForSocketOpen`.
 
-The code comes from the per-call argument or `pairingCode` in the socket config, in that order. `NCKTECH1` is the value of `DEFAULT_CONNECTION_CONFIG.pairingCode`, so a socket created with `makeWASocket` always has one; `requestPairingCode` itself has no hidden fallback and throws a clear error if the resolved config has no code. Pass the code explicitly to be safe:
+The code comes from the per-call argument or `pairingCode` in the socket config, in that order. If neither is provided, `requestPairingCode` generates a fresh secure 8-character code for that request. Passing a custom code remains supported:
 
 ```js
-const code = await socket.requestPairingCode('254700000000', 'NCKTECH1')
+const code = await socket.requestPairingCode('254700000000', 'ABCDEFGH')
 ```
 
 Pairing codes must be exactly 8 characters drawn from `123456789ABCDEFGHJKLMNPQRSTVWXYZ` (Crockford base32 — no `0`, `I`, `O` or `U`). The key is derived with PBKDF2 over the exact string, so a character the phone reinterprets produces a different key on each side and the link silently never completes; `normalizePairingCode` rejects anything outside that set rather than letting it fail later.
 
-Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `NCK-TECH1` are normalized before use, so keep the raw code for retries and add a separator only when displaying it.
+Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `ABCD-EFGH` are normalized before use, so keep the raw code for retries and add a separator only when displaying it. Do not use a permanent shared pairing code in production.
+
+### Production message storage
+
+For production deployments, configure `getMessage` with durable message storage. WhatsApp may request a message again after the in-memory retry cache has expired or after the process restarts; without the original message, Baileys cannot re-encrypt and resend it. The built-in in-memory store is useful for development, while a database-backed store should be used for long-running bots.
+
+```js
+const socket = makeWASocket({
+  auth: state,
+  getMessage: async key => messageStore.get(key.remoteJid, key.id),
+})
+```
 
 ### 9. JID Normalization & Aliases
 

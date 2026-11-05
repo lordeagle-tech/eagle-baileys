@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
+import { extractCommunityMetadata } from '../lib/Socket/communities.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { BOT_HTML_RENDERING_CONFIG, createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, shouldShowPairingPushNotification } from '../lib/index.js';
@@ -33,15 +34,15 @@ await new Promise((resolve, reject) => {
   rejectedUpgradeServer.close(error => error ? reject(error) : resolve());
 });
 
-assert.equal(DEFAULT_PAIRING_CODE, 'NCKTECH1');
+assert.equal(DEFAULT_PAIRING_CODE, undefined);
 assert.equal(DEFAULT_CONNECTION_CONFIG.pairingCode, DEFAULT_PAIRING_CODE);
-// config is the only fallback; the call argument wins, and a missing code is
-// an explicit error rather than a silent hardcoded default
+// Explicit codes remain supported, while an omitted code is generated freshly
+// for each request rather than falling back to a reusable hardcoded value.
+assert.match(resolvePairingCode({}), /^[123456789ABCDEFGHJKLMNPQRSTVWXYZ]{8}$/);
 assert.equal(resolvePairingCode({ pairingCode: 'NCKTECH1' }), 'NCKTECH1');
 assert.equal(resolvePairingCode({ pairingCode: 'NCKTECH1' }, 'ABCDEFGH'), 'ABCDEFGH');
 assert.equal(resolvePairingCode({}, 'nck-tech1'), 'NCKTECH1');
-assert.throws(() => resolvePairingCode({}), /requires a pairing code/);
-assert.throws(() => resolvePairingCode({}, ''), /requires a pairing code/);
+assert.match(resolvePairingCode({}, ''), /^[123456789ABCDEFGHJKLMNPQRSTVWXYZ]{8}$/);
 assert.equal(normalizePairingCode('NCKTECH1'), 'NCKTECH1');
 assert.equal(normalizePairingCode('NCK-TECH1'), 'NCKTECH1');
 assert.equal(normalizePairingCode('NCK--TECH1'), 'NCKTECH1');
@@ -63,6 +64,38 @@ assert.equal(normalizePhoneNumber('+254 (700) 000-000'), '254700000000');
 assert.equal(normalizeJid('+254 700 000 000'), '254700000000@s.whatsapp.net');
 assert.equal(normalizeJid('12345@c.us'), '12345@s.whatsapp.net');
 assert.equal(normalizeJid('12345:2@lid'), '12345:2@lid');
+assert.deepEqual(extractCommunityMetadata({
+  tag: 'result',
+  attrs: {},
+  content: [{
+    tag: 'group',
+    attrs: {
+      id: '120363000000000000',
+      subject: 'Community response'
+    },
+    content: []
+  }]
+}), {
+  id: '120363000000000000@g.us',
+  subject: 'Community response',
+  subjectOwner: undefined,
+  subjectTime: 0,
+  size: 0,
+  creation: 0,
+  owner: undefined,
+  desc: undefined,
+  descId: undefined,
+  linkedParent: undefined,
+  restrict: false,
+  announce: false,
+  isCommunity: false,
+  isCommunityAnnounce: false,
+  joinApprovalMode: false,
+  memberAddMode: false,
+  participants: [],
+  ephemeralDuration: undefined,
+  addressingMode: undefined
+});
 const jidResolver = createJidResolver({
   support: '+254700000001'
 });
