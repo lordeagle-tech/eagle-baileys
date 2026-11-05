@@ -352,6 +352,8 @@ const socket = makeWASocket({
 })
 ```
 
+Multi-file auth writes use per-file locks and atomic temporary-file replacement, so an interrupted write does not leave the active credential file partially written. For multi-process deployments, prefer the SQLite or another transactional auth store.
+
 ### 9. JID Normalization & Aliases
 
 Normalize phone numbers and set local aliases:

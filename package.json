@@ -32,7 +32,7 @@
     "prepack": "node ./scripts/prepack-check.js",
     "smoke": "node ./scripts/smoke-test.js && node ./scripts/feature-test.js",
     "test": "node ./scripts/feature-test.js",
-    "test:release": "npm run smoke && npm run prepack && npm pack --dry-run",
+    "test:release": "npm run smoke && node ./scripts/storage-test.js && npm run prepack && npm pack --dry-run",
     "test:buttons:pair": "node ./scripts/pair-button-test.js",
     "test:buttons:live": "node ./scripts/live-button-test.js"
   },
