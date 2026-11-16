@@ -31,6 +31,12 @@ export interface WASocket {
     lastDisconnect?: { at: Date; error?: any }
     reconnectable: boolean
   }
+  sendAlbum: (jid: string, items: Array<{ image?: any; video?: any; [key: string]: any }>, options?: any) => Promise<{
+    album: any
+    messages: any[]
+  }>
+  createCallLink: (type: 'audio' | 'video', event?: { startTime: number }, timeoutMs?: number) => Promise<string | undefined>
+  updateCallPrivacy: (value: 'all' | 'known') => Promise<void>
   requestPairingCode: (phoneNumber: string, customPairingCode?: string) => Promise<string>
   getLinkedDevices: () => Promise<any[]>
   sendMessage: (jid: string, content: any, options?: any) => Promise<any>

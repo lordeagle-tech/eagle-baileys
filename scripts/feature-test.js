@@ -674,6 +674,26 @@ assert.equal(imageButtons.interactiveMessage.body.text, 'Image buttons');
 assert.equal(imageButtons.interactiveMessage.header.hasMediaAttachment, true);
 assert.ok(imageButtons.interactiveMessage.header.imageMessage);
 
+// Native media album parent and child association
+const albumParentKey = {
+  remoteJid: '254700000000@s.whatsapp.net',
+  fromMe: true,
+  id: 'ALBUM-PARENT'
+};
+const albumParent = await generateWAMessageContent({
+  album: { expectedImageCount: 2, expectedVideoCount: 1 }
+}, {});
+assert.equal(albumParent.albumMessage.expectedImageCount, 2);
+assert.equal(albumParent.albumMessage.expectedVideoCount, 1);
+const albumChild = await generateWAMessageContent({
+  image: Buffer.from('mock-album-image'),
+  albumParentKey
+}, {
+  upload: async () => ({ mediaUrl: 'https://mock/media', directPath: 'mock-album-path' })
+});
+assert.equal(albumChild.messageContextInfo.messageAssociation.parentMessageKey.id, 'ALBUM-PARENT');
+assert.equal(albumChild.messageContextInfo.messageAssociation.associationType, proto.MessageAssociation.AssociationType.MEDIA_ALBUM);
+
 // Bot HTML rich responses
 const htmlResponse = generateBotHtmlResponse('  <h1>Hello</h1>  ', {
   responseId: 'html-response-id',

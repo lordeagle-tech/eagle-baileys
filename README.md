@@ -341,6 +341,36 @@ Pairing codes must be exactly 8 characters drawn from `123456789ABCDEFGHJKLMNPQR
 
 Phone numbers may also be passed in international format with a leading `+` or separators. Pairing codes are stored and returned in their raw 8-character form; formatted values such as `ABCD-EFGH` are normalized before use, so keep the raw code for retries and add a separator only when displaying it. Do not use a permanent shared pairing code in production.
 
+### Albums and newer WhatsApp identifiers
+
+Send a native WhatsApp media album by passing at least two image or video items. The library sends the album parent first and associates each media message with it using WhatsApp's `MEDIA_ALBUM` message association:
+
+```js
+const result = await socket.sendAlbum(jid, [
+  { image: firstImageBuffer, caption: 'First photo' },
+  { image: secondImageBuffer },
+  { video: shortVideoBuffer, mimetype: 'video/mp4' },
+])
+console.log(result.album.key.id, result.messages.length)
+```
+
+Username lookup and LID/phone-number mapping are supported. WhatsApp's newer Business-Scoped User IDs (BSUIDs) and Group Message History are not yet exposed as complete linked-device APIs by upstream Baileys, so this fork does not guess a wire format for them. They should be added only after the corresponding Web protocol flow is verified.
+
+### Audio and video calls
+
+The socket supports creating WhatsApp audio or video call links and receiving call signaling updates:
+
+```js
+const audioLink = await socket.createCallLink('audio')
+const videoLink = await socket.createCallLink('video')
+
+socket.ev.on('call', ([call]) => {
+  console.log(call.status, call.isVideo ? 'video' : 'audio', call.id)
+})
+```
+
+This library does not terminate live call media. Audio/video transport requires a WebRTC implementation with ICE, DTLS, SRTP, device capture, codecs, and WhatsApp's current call signaling flow. The current upstream Baileys project exposes call-link and signaling support but does not provide that media engine, so adding a fake `startCall()` method would not produce a working call.
+
 ### Production message storage
 
 For production deployments, configure `getMessage` with durable message storage. WhatsApp may request a message again after the in-memory retry cache has expired or after the process restarts; without the original message, Baileys cannot re-encrypt and resend it. The built-in in-memory store is useful for development, while a database-backed store should be used for long-running bots.
