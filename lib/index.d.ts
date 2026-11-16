@@ -20,6 +20,17 @@ export interface WASocket {
   ev: any
   user?: any
   authState?: AuthenticationState
+  getConnectionHealth: () => {
+    state: string
+    connectedAt?: Date
+    uptimeMs: number
+    lastReceivedAt?: Date
+    lastKeepAliveSent?: Date
+    lastKeepAliveResponse?: Date
+    keepAliveFailures: number
+    lastDisconnect?: { at: Date; error?: any }
+    reconnectable: boolean
+  }
   requestPairingCode: (phoneNumber: string, customPairingCode?: string) => Promise<string>
   getLinkedDevices: () => Promise<any[]>
   sendMessage: (jid: string, content: any, options?: any) => Promise<any>
