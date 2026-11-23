@@ -5,7 +5,7 @@
 **Package:** `@lordeagle21/baileys@2.3.0`  
 **Audit date:** 2026-11-04
 
-> **2026-11-23 addendum (v3.0.0):** The P0 pairing-code finding above was already resolved in this fork (`DEFAULT_PAIRING_CODE` is `undefined`), and `lib/index.d.ts` plus prepack/smoke/storage/feature checks now exist. This release also makes the reconnect wrapper's connection helpers stable across replacements, clears stale pairing state on close, adds poll-vote generation/encryption and `sendPollVote`, adds `checkNumber`, `blockContact`/`unblockContact`/`pinChat`, `downloadViewOnce`, and Close Friends status audience support. The remaining findings below are unchanged unless explicitly superseded. Full reportSpam requests, scheduled channel posts, channel poll votes/view receipts, Close Friends list management, and sticker pack app-state patches are still protocol-gated rather than guessed.
+> **2026-11-23 addendum (v3.0.1):** The P0 pairing-code finding above was already resolved in this fork (`DEFAULT_PAIRING_CODE` is `undefined`), and `lib/index.d.ts` plus prepack/smoke/storage/feature checks now exist. This release also makes the reconnect wrapper's connection helpers stable across replacements, clears stale pairing state on close, adds poll-vote generation/encryption and `sendPollVote`, adds `checkNumber`, `blockContact`/`unblockContact`/`pinChat`, `downloadViewOnce`, and Close Friends status audience support. The remaining findings below are unchanged unless explicitly superseded. Full reportSpam requests, scheduled channel posts, channel poll votes/view receipts, Close Friends list management, and sticker pack app-state patches are still protocol-gated rather than guessed.
 
 ## Overall assessment
 

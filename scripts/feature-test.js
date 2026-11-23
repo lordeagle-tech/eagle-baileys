@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import EventEmitter from 'node:events';
 import { createServer } from 'node:http';
 import { proto } from '../WAProto/compiler.js';
 import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
@@ -6,6 +7,7 @@ import { extractCommunityMetadata } from '../lib/Socket/communities.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { BOT_HTML_RENDERING_CONFIG, createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
 import makeWASocket, { createJidResolver, decryptPollVote, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, encryptPollVote, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, sha256, shouldShowPairingPushNotification } from '../lib/index.js';
+import { makeReconnectableSocket } from '../lib/Socket/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
   response.writeHead(403);
@@ -1057,4 +1059,35 @@ const closeFriendsStatus = await generateWAMessageContent({
 }, {});
 assert.equal(closeFriendsStatus.extendedTextMessage.contextInfo.statusAudienceMetadata.audienceType, 1);
 
-console.log('Feature tests passed: buttons, interactive CTA rows, native lists, list/CTA reply parsing, reactions, edits, polls/quizzes, poll votes, subscription guards, group participant/v2 functions, forwarded reply options, contact/fake-contact, status/newsletter and linked-device helpers.');
+const noopLogger = {
+  fatal() {}, error() {}, warn() {}, info() {}, debug() {}, trace() {},
+  child() { return noopLogger; }
+};
+const fakeInnerSocket = {
+  ev: new EventEmitter(),
+  connectionState: 'open',
+  ping: async () => true,
+  end: async () => {},
+  getConnectionHealth: () => ({ uptimeMs: 1 })
+};
+const wrapperSocket = makeReconnectableSocket({
+  logger: noopLogger,
+  socketFactory: () => fakeInnerSocket,
+  defaultQueryTimeoutMs: 1000,
+  shouldReconnect: () => false
+});
+const customDownloader = async () => Buffer.from('custom-download');
+wrapperSocket.downloadMediaMessage = customDownloader;
+assert.equal(wrapperSocket.downloadMediaMessage, customDownloader);
+assert.deepEqual(await wrapperSocket.downloadMediaMessage(), Buffer.from('custom-download'));
+assert.equal(wrapperSocket.connectionState, 'open');
+assert.equal(wrapperSocket.isConnected, true);
+assert.equal(await wrapperSocket.ping(), true);
+let wrapperConnected = false;
+const offWrapperConnected = wrapperSocket.onConnected(() => { wrapperConnected = true; });
+await Promise.resolve();
+assert.equal(wrapperConnected, true);
+offWrapperConnected();
+await wrapperSocket.end();
+
+console.log('Feature tests passed: buttons, interactive CTA rows, native lists, list/CTA reply parsing, reactions, edits, polls/quizzes, poll votes, subscription guards, group participant/v2 functions, forwarded reply options, contact/fake-contact, status/newsletter, linked-device helpers and reconnect wrapper overrides.');

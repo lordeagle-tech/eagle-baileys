@@ -55,7 +55,7 @@ const off = socket.onConnected(() => console.log('bot is online'))
 // off()
 ```
 
-These helpers stay bound to the stable socket facade, so `onConnected` keeps firing after an automatic reconnect and calls to `waitForConnection` / `isConnected` reflect the replacement socket rather than a closed one. `getConnectionHealth()` also reports the live wrapper state and an `isReconnecting` flag.
+These helpers stay bound to the stable socket facade, so `onConnected` keeps firing after an automatic reconnect and calls to `waitForConnection` / `isConnected` reflect the replacement socket rather than a closed one. `getConnectionHealth()` also reports the live wrapper state and an `isReconnecting` flag. Properties you assign to the socket (for example a custom `downloadMediaMessage`) are preserved on that facade and take precedence over the inner socket.
 
 ## Bot Features
 
