@@ -55,6 +55,8 @@ const off = socket.onConnected(() => console.log('bot is online'))
 // off()
 ```
 
+These helpers stay bound to the stable socket facade, so `onConnected` keeps firing after an automatic reconnect and calls to `waitForConnection` / `isConnected` reflect the replacement socket rather than a closed one. `getConnectionHealth()` also reports the live wrapper state and an `isReconnecting` flag.
+
 ## Bot Features
 
 ### 1. Contact & Fake Contact Quote (`fkon`)
@@ -224,6 +226,24 @@ await socket.sendMessage(jid, {
 })
 ```
 
+Timed polls pass `endTime` (seconds), and `allowAddOption` / `hideParticipantName` are supported. Cast a vote with the poll's `messageContextInfo.messageSecret` and the deviceless creator/voter JIDs in the chat's addressing mode (LIDs first in LID chats):
+
+```js
+const pollMessage = await socket.sendMessage(jid, {
+  poll: { name: 'Lunch?', values: ['Pizza', 'Sushi'], selectableCount: 1 },
+})
+
+await socket.sendPollVote(jid, {
+  pollCreationMessageKey: pollMessage.key,
+  pollEncKey: pollMessage.message.messageContextInfo.messageSecret,
+  selectedOptions: ['Pizza'], // [] withdraws the vote
+  pollCreatorJid: socket.user.lid,          // or socket.user.id for a PN chat
+  voterJid: '111111111111111@lid',
+})
+```
+
+`encryptPollVote` / `decryptPollVote` are exported for custom flows. Incoming votes are decrypted with the LID/PN fallback matrix, so votes in LID-addressed groups aggregate correctly.
+
 ### 6. Status & Newsletter
 
 ```js
@@ -236,6 +256,19 @@ await socket.sendStatus({ text: 'Bot is online!' }, [
 // Send to a WhatsApp channel (newsletter)
 await socket.sendNewsletterMessage('120363322464215140@newsletter', {
   text: 'New release!',
+})
+
+// Limit a status post to the Close Friends audience
+await socket.sendStatus({ text: 'Behind the scenes' }, recipients, {
+  audience: 'close_friends',
+})
+```
+
+Inbound channel view counts are emitted as `newsletter.view`:
+
+```js
+socket.ev.on('newsletter.view', update => {
+  console.log(update.server_id, update.count)
 })
 ```
 
@@ -399,6 +432,39 @@ const socket = makeWASocket({
 await socket.sendMessage('support', { text: 'Hello support!' })
 await socket.sendMessage('+254 700 000 002', { text: 'Hello!' })
 ```
+
+## Contacts, blocklist, pins, and view-once media
+
+```js
+// Single-number existence check
+const { jid, exists } = await socket.checkNumber('+254 700 000 000')
+
+// Block / unblock with automatic LID <-> PN resolution
+await socket.blockContact(jid)
+await socket.unblockContact(jid)
+console.log(await socket.fetchBlocklist())
+
+// Pin / unpin a chat (app-state)
+await socket.pinChat(jid, true)
+await socket.pinChat(jid, false)
+
+// Pin a message in a chat
+await socket.sendMessage(jid, {
+  pin: message.key,
+  type: 1,       // 1 = pin for 24h, 2 = 72h, 3 = keep
+  time: 86400,
+})
+
+// Download a view-once image/video/audio/sticker/document while its
+// mediaKey/directPath are still available in the received message.
+const buffer = await socket.downloadViewOnce(viewOnceMessage)
+```
+
+Server-side recovery of a view-once item after the media was consumed or expired is not implemented: it needs a verified re-request flow, not a guessed stanza. Persist messages/media if you need them later.
+
+## Protocol-gated features
+
+Reporting-token helpers (`getMessageReportingToken`, `shouldIncludeReportingToken`) are included, but a full `reportSpam` action is not: no verified IQ shape was available in this fork's captures. Channel scheduled posts, channel poll votes, channel view receipts, Close Friends list management, and sticker save/packs app-state patches are also intentionally omitted rather than guessed. If you have a packet capture from a real client for any of these, they can be added without inventing wire formats.
 
 ## License
 

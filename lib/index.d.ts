@@ -20,6 +20,11 @@ export interface WASocket {
   ev: any
   user?: any
   authState?: AuthenticationState
+  readonly connectionState: 'connecting' | 'open' | 'close'
+  readonly isConnected: boolean
+  waitForConnection: (timeoutMs?: number) => Promise<void>
+  onConnected: (handler: () => void) => () => void
+  waitForConnectionUpdate: (predicate: (update: any) => boolean, timeoutMs?: number) => Promise<any>
   getConnectionHealth: () => {
     state: string
     connectedAt?: Date
@@ -30,6 +35,7 @@ export interface WASocket {
     keepAliveFailures: number
     lastDisconnect?: { at: Date; error?: any }
     reconnectable: boolean
+    isReconnecting: boolean
   }
   sendAlbum: (jid: string, items: Array<{ image?: any; video?: any; [key: string]: any }>, options?: any) => Promise<{
     album: any
@@ -42,7 +48,17 @@ export interface WASocket {
   sendMessage: (jid: string, content: any, options?: any) => Promise<any>
   sendReaction: (jid: string, key: any, text: string, options?: any) => Promise<any>
   removeReaction: (jid: string, key: any, options?: any) => Promise<any>
+  sendPollVote: (jid: string, pollVote: any) => Promise<any>
+  sendStatus: (content: any, recipientJids?: string[], options?: any) => Promise<any>
+  downloadViewOnce: (message: any, type?: 'buffer' | 'stream' | string, options?: any) => Promise<any>
   updateMediaMessage: (message: any) => Promise<any>
+  checkNumber: (phoneNumber: string | number) => Promise<{ jid: string; exists: boolean }>
+  blockContact: (jid: string) => Promise<any>
+  unblockContact: (jid: string) => Promise<any>
+  pinChat: (jid: string, pin?: boolean) => Promise<any>
+  fetchBlocklist: () => Promise<string[]>
+  setPrivacy: (privacy: Record<string, any>) => Promise<any>
+  getPrivacy: () => Promise<Record<string, any>>
   [key: string]: any
 }
 
@@ -78,4 +94,12 @@ export declare const generateWAMessageContent: (...args: any[]) => Promise<any>
 export declare const generateWAMessageFromContent: (...args: any[]) => Promise<any>
 export declare const prepareWAMessageMedia: (...args: any[]) => Promise<any>
 export declare const downloadMediaMessage: (...args: any[]) => Promise<any>
+export declare const downloadViewOnceMessage: (message: any, type?: 'buffer' | 'stream' | string, options?: any, ctx?: any) => Promise<any>
+export declare const encryptPollVote: (vote: { selectedOptions: Uint8Array[] }, context: {
+  pollCreatorJid: string
+  pollMsgId: string
+  pollEncKey: Uint8Array
+  voterJid: string
+}) => { encPayload: Uint8Array; encIv: Uint8Array }
+export declare const decryptPollVote: (...args: any[]) => any
 export declare const getAggregateVotesInPollMessage: (...args: any[]) => Promise<any>

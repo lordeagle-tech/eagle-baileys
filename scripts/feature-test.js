@@ -5,7 +5,7 @@ import { assertUserPresenceSubscriptionJid } from '../lib/Socket/chats.js';
 import { extractCommunityMetadata } from '../lib/Socket/communities.js';
 import { WebSocketClient } from '../lib/Socket/Client/websocket.js';
 import { BOT_HTML_RENDERING_CONFIG, createFakeContact, generateBotHtmlResponse, generateVCard, generateWAMessage, generateWAMessageContent, generateWAMessageFromContent, getButtonReplyInfo, getCtaReplyInfo, getListReplyInfo } from '../lib/Utils/messages.js';
-import makeWASocket, { createJidResolver, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, shouldShowPairingPushNotification } from '../lib/index.js';
+import makeWASocket, { createJidResolver, decryptPollVote, DEFAULT_CONNECTION_CONFIG, DEFAULT_PAIRING_CODE, encryptPollVote, normalizeJid, normalizePairingCode, normalizePhoneNumber, resolvePairingCode, sha256, shouldShowPairingPushNotification } from '../lib/index.js';
 
 const rejectedUpgradeServer = createServer((_request, response) => {
   response.writeHead(403);
@@ -632,6 +632,101 @@ await assert.rejects(() => generateWAMessageContent({
   poll: { name: 'Quiz', values: ['A', 'B'], selectableCount: 2, pollType: 'QUIZ', correctAnswer: 'A' }
 }, {}), /only support a single selectable option/);
 
+// Timed polls and add-option permission pass through to the protobuf
+const timedPoll = await generateWAMessageContent({
+  poll: {
+    name: 'Meeting',
+    values: ['Today', 'Tomorrow'],
+    endTime: 1799999999,
+    allowAddOption: true,
+    hideParticipantName: true
+  }
+}, {});
+assert.equal(timedPoll.pollCreationMessage.endTime, 1799999999);
+assert.equal(timedPoll.pollCreationMessage.allowAddOption, true);
+assert.equal(timedPoll.pollCreationMessage.hideParticipantName, true);
+
+// Poll voting: encrypt/decrypt round trip with LID and phone-number addressing
+const pollEncKey = new Uint8Array(32).fill(5);
+const pollCtx = {
+  pollCreatorJid: '222@lid',
+  pollMsgId: '3EB0POLL',
+  pollEncKey,
+  voterJid: '111@lid'
+};
+const vote = {
+  selectedOptions: [sha256(Buffer.from('Yes')), sha256(Buffer.from('Maybe'))]
+};
+const encryptedVote = encryptPollVote(vote, pollCtx);
+assert.equal(encryptedVote.encIv.length, 12);
+assert.deepEqual(decryptPollVote(encryptedVote, pollCtx).selectedOptions.map(o => Buffer.from(o)), vote.selectedOptions);
+assert.throws(() => decryptPollVote(encryptedVote, {
+  ...pollCtx,
+  voterJid: '254700000000@s.whatsapp.net'
+}));
+const pnCtx = {
+  ...pollCtx,
+  pollCreatorJid: '254700000001@s.whatsapp.net',
+  voterJid: '254700000000@s.whatsapp.net'
+};
+assert.deepEqual(decryptPollVote(encryptPollVote(vote, pnCtx), pnCtx).selectedOptions.map(o => Buffer.from(o)), vote.selectedOptions);
+assert.notDeepEqual(encryptPollVote(vote, pollCtx).encIv, encryptPollVote(vote, pollCtx).encIv);
+
+const pollVoteKey = {
+  remoteJid: '222@lid',
+  id: '3EB0POLL',
+  fromMe: false
+};
+const generatedVote = await generateWAMessageContent({
+  pollVote: {
+    pollCreationMessageKey: pollVoteKey,
+    pollEncKey,
+    selectedOptions: ['Yes'],
+    ...pollCtx
+  }
+}, {});
+assert.deepEqual(generatedVote.pollUpdateMessage.pollCreationMessageKey, pollVoteKey);
+assert.deepEqual(generatedVote.pollUpdateMessage.metadata, {});
+assert.ok(generatedVote.pollUpdateMessage.senderTimestampMs > 0);
+assert.deepEqual(decryptPollVote(generatedVote.pollUpdateMessage.vote, pollCtx).selectedOptions.map(o => Buffer.from(o)), [sha256(Buffer.from('Yes'))]);
+
+const withdrawnVote = await generateWAMessageContent({
+  pollVote: {
+    pollCreationMessageKey: pollVoteKey,
+    pollEncKey,
+    selectedOptions: [],
+    ...pollCtx
+  }
+}, {});
+assert.deepEqual(decryptPollVote(withdrawnVote.pollUpdateMessage.vote, pollCtx).selectedOptions || [], []);
+
+await assert.rejects(() => generateWAMessageContent({
+  pollVote: {
+    pollCreationMessageKey: { remoteJid: '222@lid', fromMe: false },
+    pollEncKey,
+    selectedOptions: ['Yes'],
+    ...pollCtx
+  }
+}, {}), /must have an id/);
+await assert.rejects(() => generateWAMessageContent({
+  pollVote: {
+    pollCreationMessageKey: pollVoteKey,
+    pollEncKey,
+    selectedOptions: ['Yes'],
+    pollCreatorJid: '222:1@lid',
+    voterJid: pollCtx.voterJid
+  }
+}, {}), /must be a JID without device/);
+await assert.rejects(() => generateWAMessageContent({
+  pollVote: {
+    pollCreationMessageKey: pollVoteKey,
+    pollEncKey,
+    selectedOptions: ['Yes'],
+    pollCreatorJid: pollCtx.pollCreatorJid,
+    voterJid: '254700000000@s.whatsapp.net'
+  }
+}, {}), /same addressing mode/);
+
 assert.equal(assertUserPresenceSubscriptionJid('12345@c.us'), '12345@s.whatsapp.net');
 assert.equal(assertUserPresenceSubscriptionJid('12345@lid'), '12345@lid');
 assert.throws(() => assertUserPresenceSubscriptionJid('12345@g.us'), /individual user JIDs/);
@@ -936,4 +1031,30 @@ assert.equal(multiContactsMsg.contactsArrayMessage.contacts.length, 2);
 // Clean up/close socket connection so it doesn't keep the event loop open
 mockSock.end(new Error('Test cleanup'));
 
-console.log('Feature tests passed: buttons, interactive CTA rows, native lists, list/CTA reply parsing, reactions, edits, polls/quizzes, subscription guards, group participant/v2 functions, forwarded reply options, contact/fake-contact, status/newsletter and linked-device helpers.');
+const viewOnceMessage = await generateWAMessageContent({
+  image: Buffer.from('fake-image'),
+  viewOnce: true
+}, {
+  upload: async () => ({
+    mediaUrl: 'https://mmg.whatsapp.net/fake',
+    directPath: '/v/t62.7118-24/fake.enc',
+    encFilehash: Buffer.from('enc'),
+    filehash: Buffer.from('hash'),
+    fileLength: 10
+  })
+});
+assert.ok(viewOnceMessage.viewOnceMessage?.message?.imageMessage);
+assert.equal(typeof mockSock.downloadViewOnce, 'function');
+assert.equal(typeof mockSock.checkNumber, 'function');
+assert.equal(typeof mockSock.blockContact, 'function');
+assert.equal(typeof mockSock.unblockContact, 'function');
+assert.equal(typeof mockSock.pinChat, 'function');
+const closeFriendsStatus = await generateWAMessageContent({
+  text: 'Close friends only',
+  contextInfo: {
+    statusAudienceMetadata: { audienceType: 1 }
+  }
+}, {});
+assert.equal(closeFriendsStatus.extendedTextMessage.contextInfo.statusAudienceMetadata.audienceType, 1);
+
+console.log('Feature tests passed: buttons, interactive CTA rows, native lists, list/CTA reply parsing, reactions, edits, polls/quizzes, poll votes, subscription guards, group participant/v2 functions, forwarded reply options, contact/fake-contact, status/newsletter and linked-device helpers.');
