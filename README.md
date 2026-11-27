@@ -101,6 +101,37 @@ await socket.sendMessage(jid, {
 
 Incoming sound stickers normalize to `message.stickerMessage` with `message.stickerMessage.audioMessage`. Use `downloadMediaMessage({ key, message: { audioMessage: stickerMessage.audioMessage } })` to fetch the clip.
 
+## Chat Themes / Group Wallpaper
+
+`chatTheme` sends the WhatsApp chat-theme protocol message used to set a group wallpaper. Theme IDs and wallpaper IDs depend on the WhatsApp client version, so unsupported IDs or older clients may ignore the message.
+
+```js
+await socket.sendMessage(jid, {
+  chatTheme: {
+    chatThemeId: 'Royal-Blue',
+    animatedWallpaper: {
+      id: 'wallpaper-1',
+      dimLevel: 0.25
+    }
+  }
+})
+```
+
+```js
+await socket.sendMessage(jid, {
+  chatTheme: {
+    solidColor: {
+      colorLight: '#FFFFFFFF',
+      colorDark: '#FF101010',
+      doodleColorLight: '#FFCCE8FF',
+      isDoodleEnabled: true
+    }
+  }
+})
+```
+
+Use `clearTheme: true` to remove the chat theme.
+
 ## Bot Features
 
 ### 1. Contact & Fake Contact Quote (`fkon`)

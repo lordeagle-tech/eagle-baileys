@@ -1059,6 +1059,33 @@ const closeFriendsStatus = await generateWAMessageContent({
 }, {});
 assert.equal(closeFriendsStatus.extendedTextMessage.contextInfo.statusAudienceMetadata.audienceType, 1);
 
+const chatTheme = await generateWAMessageContent({
+  chatTheme: {
+    chatThemeId: 'Royal-Blue',
+    animatedWallpaper: { id: 'wallpaper-1', dimLevel: 0.25 }
+  }
+}, {});
+assert.equal(chatTheme.protocolMessage.type, proto.Message.ProtocolMessage.Type.CHAT_THEME_SETTING);
+assert.equal(chatTheme.protocolMessage.chatThemeSetting.colorSchemeId, 'Royal-Blue@Tonal');
+assert.equal(chatTheme.protocolMessage.chatThemeSetting.animatedWallpaper.animatedWallpaperId, 'wallpaper-1');
+const decodedTheme = proto.Message.decode(proto.Message.encode(proto.Message.create(chatTheme)).finish());
+assert.equal(decodedTheme.protocolMessage.chatThemeSetting.animatedWallpaper.animatedWallpaperId, 'wallpaper-1');
+
+const solidTheme = await generateWAMessageContent({
+  chatTheme: {
+    solidColor: {
+      colorLight: '#FFFFFFFF',
+      colorDark: 0xff101010,
+      doodleColorLight: '#FFCCE8FF',
+      isDoodleEnabled: true
+    }
+  }
+}, {});
+assert.equal(solidTheme.protocolMessage.chatThemeSetting.solidColor.backgroundLightArgb, 0xffffffff);
+assert.equal(solidTheme.protocolMessage.chatThemeSetting.solidColor.backgroundDarkArgb, 0xff101010);
+assert.equal(solidTheme.protocolMessage.chatThemeSetting.solidColor.doodleLightArgb, 0xffcce8ff);
+assert.equal(solidTheme.protocolMessage.chatThemeSetting.solidColor.isDoodleEnabled, true);
+
 const noopLogger = {
   fatal() {}, error() {}, warn() {}, info() {}, debug() {}, trace() {},
   child() { return noopLogger; }
