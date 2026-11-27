@@ -103,3 +103,59 @@ export declare const encryptPollVote: (vote: { selectedOptions: Uint8Array[] }, 
 }) => { encPayload: Uint8Array; encIv: Uint8Array }
 export declare const decryptPollVote: (...args: any[]) => any
 export declare const getAggregateVotesInPollMessage: (...args: any[]) => Promise<any>
+
+export declare function prepareAudioStickerMessage(content: {
+  audioSticker?: {
+    sticker: any
+    audio: any
+    isAnimated?: boolean
+    seconds?: number
+    waveform?: Uint8Array
+    emojis?: string
+    premium?: number
+    messageSecret?: Uint8Array
+    contextInfo?: any
+  }
+  sticker?: any
+  audio?: any
+  isAnimated?: boolean
+}, options: any): Promise<any>
+
+export declare class VoipClient {
+  constructor(config?: {
+    pthreadPoolSize?: number
+    maxConcurrentCalls?: number
+    onLimit?: 'reject' | 'queue'
+    logger?: any
+    diagnostic?: boolean
+    debugVoip?: boolean
+  })
+  connect: () => Promise<void>
+  initWithSocket: (socket: any) => Promise<void>
+  call: (phoneNumber: string, opts?: any) => Promise<any>
+  callMany: (requests: Array<{ jid: string; options?: any }>) => Promise<any[]>
+  endAllCalls: (reason?: string) => void
+  getActiveCalls: () => any[]
+  getActiveCallCount: () => number
+  getWaitingCalls: () => any[]
+  getMemoryStats: () => any
+  cleanup: () => void
+  disconnect: () => void
+  destroy: () => void
+  on: (event: string, handler: (...args: any[]) => void) => any
+  off: (event: string, handler: (...args: any[]) => void) => any
+  once: (event: string, handler: (...args: any[]) => void) => any
+}
+
+export declare const ActiveCall: any
+export declare const CallSession: any
+export declare const CallManager: any
+export declare const SignalingBridge: any
+export declare const WasmEngine: any
+export declare const ensureWasmAssets: (...args: any[]) => Promise<any>
+export declare const VideoFeeder: any
+export declare const AudioFeeder: any
+export declare const VoipResourceManager: any
+export declare const CallState: Record<string, any>
+export declare const CallDirection: Record<string, any>
+export declare const CallMediaType: Record<string, any>

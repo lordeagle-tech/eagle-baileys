@@ -580,6 +580,19 @@ if (isGeneratorRun) {
 const tablePath = fileURLToPath(new URL('./WAProto.json', import.meta.url));
 const built = isGeneratorRun ? {} : makeProto(tablePath);
 export const proto = built.proto;
+if (proto?.Message?.encode && !proto.Message.__audioStickerPatched) {
+  const encodeMessage = proto.Message.encode;
+  proto.Message.encode = function (message, writer) {
+    if (message?.audioStickerMessage && message?.stickerMessage) {
+      const copy = Object.create(Object.getPrototypeOf(message) || null);
+      Object.assign(copy, message);
+      delete copy.stickerMessage;
+      return encodeMessage.call(this, copy, writer);
+    }
+    return encodeMessage.call(this, message, writer);
+  };
+  proto.Message.__audioStickerPatched = true;
+}
 export const codec = built.codec;
 export default {
   proto,

@@ -57,6 +57,50 @@ const off = socket.onConnected(() => console.log('bot is online'))
 
 These helpers stay bound to the stable socket facade, so `onConnected` keeps firing after an automatic reconnect and calls to `waitForConnection` / `isConnected` reflect the replacement socket rather than a closed one. `getConnectionHealth()` also reports the live wrapper state, an `isReconnecting` flag, and keepalive health (`lastReceivedAt`, `lastKeepAliveSent`, `lastKeepAliveResponse`, `keepAliveFailures`). Stale sockets are closed when no frames arrive for `keepAliveIntervalMs + 5000`, matching upstream Baileys; individual ping failures are reported rather than silently swallowed, and `ping()` throws on a timed-out reply. Properties you assign to the socket (for example a custom `downloadMediaMessage`) are preserved on that facade and take precedence over the inner socket.
 
+## Experimental Calls
+
+`VoipClient` provides outbound WhatsApp voice and video calls using the connected socket. It is experimental, outbound-only, depends on private WhatsApp Web internals, and requires FFmpeg on `PATH` for media streaming.
+
+```js
+import { VoipClient } from '@lordeagle21/baileys'
+
+const voip = new VoipClient({ pthreadPoolSize: 4 })
+await voip.initWithSocket(socket)
+
+const call = await voip.call('254712345678', {
+  isVideo: true,
+  videoSource: 'clip.mp4',
+  videoWidth: 640,
+  videoHeight: 480,
+  videoFps: 15,
+  audioSource: 'silence',
+  durationMs: 120_000
+})
+
+call.on('connected', () => console.log('call connected'))
+call.on('videoStarted', () => console.log('video streaming'))
+call.on('ended', reason => console.log('call ended:', reason))
+
+voip.disconnect()
+```
+
+## Sound Stickers
+
+`audioSticker` sends a WebP sticker with an embedded Opus/Ogg audio clip. WhatsApp plays the nested audio when the recipient taps the sticker's audio icon.
+
+```js
+await socket.sendMessage(jid, {
+  audioSticker: {
+    sticker: webpBuffer,
+    audio: opusOggBuffer,
+    isAnimated: true,
+    seconds: 5
+  }
+})
+```
+
+Incoming sound stickers normalize to `message.stickerMessage` with `message.stickerMessage.audioMessage`. Use `downloadMediaMessage({ key, message: { audioMessage: stickerMessage.audioMessage } })` to fetch the clip.
+
 ## Bot Features
 
 ### 1. Contact & Fake Contact Quote (`fkon`)

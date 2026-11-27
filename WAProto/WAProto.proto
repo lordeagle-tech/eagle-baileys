@@ -2461,6 +2461,7 @@ message Message {
     optional SplitPaymentMessage splitPaymentMessage = 125;
     optional FutureProofMessage newsletterAdminProfileStatusMessage = 126;
     optional RootSecretDistributeMessage rootSecretDistributeMessage = 127;
+    optional FutureProofMessage audioStickerMessage = 134;
     message AlbumMessage {
         optional uint32 expectedImageCount = 2;
         optional uint32 expectedVideoCount = 3;
@@ -4017,6 +4018,9 @@ message Message {
         optional string accessibilityLabel = 22;
         optional int32 premium = 24;
         optional string emojis = 25;
+        oneof audio {
+            AudioMessage audioMessage = 26;
+        }
     }
     
     message StickerPackMessage {
